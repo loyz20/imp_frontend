@@ -14,7 +14,7 @@ import {
 /* ── Constants ── */
 const KATEGORI_OPTIONS = [
   { value: 'obat', label: 'Obat' },
-  { value: 'alat_kesehatan', label: 'Alat Kesehatan' },
+  { value: 'alat_kesehatan', label: 'Alkes' },
 ];
 
 const GOLONGAN_BY_CATEGORY = {
@@ -55,8 +55,16 @@ const SATUAN_OPTIONS = [
   'Pcs', 'Pack', 'Rol', 'Lembar', 'Set', 'Kg', 'Gram', 'Liter', 'mL',
 ];
 
-const KATEGORI_LABELS = Object.fromEntries(KATEGORI_OPTIONS.map((k) => [k.value, k.label]));
+const KATEGORI_LABELS = {
+  ...Object.fromEntries(KATEGORI_OPTIONS.map((k) => [k.value, k.label])),
+  alat_kesehatan: 'Alkes',
+};
 const GOLONGAN_MAP = Object.fromEntries(GOLONGAN_OPTIONS.map((g) => [g.value, g]));
+
+function normalizeProductCategory(category) {
+  if (category === 'alkes') return 'alat_kesehatan';
+  return category || 'obat';
+}
 
 /* ── Role helpers ── */
 const CAN_CRUD_ROLES = ['superadmin', 'admin', 'apoteker'];
@@ -402,7 +410,7 @@ function ProductFormModal({ product, onClose, onSaved }) {
     name: product?.name || '',
     sku: product?.sku || '',
     barcode: product?.barcode || '',
-    category: product?.category || 'obat',
+    category: normalizeProductCategory(product?.category),
     golongan: product?.golongan || '',
     // Regulasi
     nie: product?.nie || '',

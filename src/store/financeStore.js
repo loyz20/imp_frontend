@@ -37,7 +37,7 @@ const useFinanceStore = create((set, get) => ({
   /* ── Receivables (Piutang) ── */
   receivables: [],
   receivablePagination: null,
-  receivableFilters: { page: 1, limit: 10, search: '', aging: '', dateFrom: '', dateTo: '', sort: '-totalOutstanding' },
+  receivableFilters: { page: 1, limit: 10, search: '', status: '', aging: '', dateFrom: '', dateTo: '', sort: '-totalOutstanding' },
 
   setReceivableFilters: (f) =>
     set((s) => ({ receivableFilters: { ...s.receivableFilters, ...f, page: f.page ?? 1 } })),

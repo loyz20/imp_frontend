@@ -11,24 +11,37 @@ import {
 /* ── Constants ── */
 const KATEGORI_OPTIONS = [
   { value: 'obat', label: 'Obat' },
-  { value: 'alkes', label: 'Alkes' },
-  { value: 'bhp', label: 'BHP' },
-  { value: 'suplemen', label: 'Suplemen' },
-  { value: 'kosmetik', label: 'Kosmetik' },
-  { value: 'lainnya', label: 'Lainnya' },
+  { value: 'alat_kesehatan', label: 'Alkes' },
+];
+
+const GOLONGAN_OPTIONS = [
+  { value: 'prekursor', label: 'Prekursor', color: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'obat_tertentu', label: 'Obat Tertentu', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { value: 'obat_keras', label: 'Obat Keras', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  { value: 'obat_bebas_terbatas', label: 'Obat Bebas Terbatas', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { value: 'obat_bebas', label: 'Obat Bebas', color: 'bg-green-50 text-green-700 border-green-200' },
+  { value: 'suplemen', label: 'Suplemen', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { value: 'obat_tradisional', label: 'Obat Tradisional', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { value: 'elektromedik_non_radiasi', label: 'Elektromedik Non Radiasi', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { value: 'non_elektromedik_non_steril', label: 'Non Elektromedik Non Steril', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { value: 'non_elektromedik_steril', label: 'Non Elektromedik Steril', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { value: 'diagnostik_invitro', label: 'Diagnostik Invitro', color: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { value: 'bmhp', label: 'BMHP', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
+  { value: 'pkrt', label: 'PKRT', color: 'bg-pink-50 text-pink-700 border-pink-200' },
+  { value: 'lainnya', label: 'Lainnya', color: 'bg-gray-100 text-gray-700 border-gray-200' },
 ];
 
 const GOLONGAN_MAP = {
-  narkotika: { label: 'Narkotika', color: 'bg-red-100 text-red-700 border-red-200' },
-  psikotropika: { label: 'Psikotropika', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  obat_keras: { label: 'Obat Keras', color: 'bg-rose-50 text-rose-700 border-rose-200' },
-  obat_keras_terbatas: { label: 'Obat Keras Terbatas', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  obat_bebas_terbatas: { label: 'Obat Bebas Terbatas', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  obat_bebas: { label: 'Obat Bebas', color: 'bg-green-50 text-green-700 border-green-200' },
-  obat_herbal: { label: 'Obat Herbal', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  fitofarmaka: { label: 'Fitofarmaka', color: 'bg-teal-50 text-teal-700 border-teal-200' },
-  suplemen: { label: 'Suplemen', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  alkes: { label: 'Alkes', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  ...Object.fromEntries(GOLONGAN_OPTIONS.map((item) => [item.value, item])),
+  obat_keras_terbatas: { label: 'Obat Tertentu', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  obat_herbal: { label: 'Obat Tradisional', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  fitofarmaka: { label: 'Obat Tradisional', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
+
+const KATEGORI_LABELS = {
+  obat: 'Obat',
+  alkes: 'Alkes',
+  alat_kesehatan: 'Alkes',
 };
 
 const STOCK_STATUS = {
@@ -177,8 +190,8 @@ export default function StockWarehouse() {
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
           >
             <option value="">Semua Golongan</option>
-            {Object.entries(GOLONGAN_MAP).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
+            {GOLONGAN_OPTIONS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
             ))}
           </select>
           <select
@@ -249,7 +262,7 @@ export default function StockWarehouse() {
                         <p className="text-xs text-gray-400">{prod.sku || '-'}</p>
                       </td>
                       <td className="px-5 py-3.5 hidden md:table-cell">
-                        <span className="text-gray-700 capitalize">{prod.kategori || '-'}</span>
+                        <span className="text-gray-700">{KATEGORI_LABELS[prod.kategori] || KATEGORI_LABELS[prod.category] || prod.kategori || prod.category || '-'}</span>
                       </td>
                       <td className="px-5 py-3.5 hidden lg:table-cell">
                         {gol ? (

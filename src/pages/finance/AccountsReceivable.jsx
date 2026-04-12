@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import useFinanceStore from '../../store/financeStore';
 import Pagination from '../../components/Pagination';
+import InvoicePrintTemplate from '../../components/InvoicePrintTemplate';
+import financeService from '../../services/financeService';
 import toast from 'react-hot-toast';
 import {
-  TrendingUp, Loader2, Clock, AlertTriangle, CheckCircle, CircleDollarSign, Plus, X,
+  TrendingUp, Loader2, Clock, AlertTriangle, CheckCircle, CircleDollarSign, Plus, X, Printer,
 } from 'lucide-react';
 
 const AGING_OPTIONS = [
@@ -12,6 +14,12 @@ const AGING_OPTIONS = [
   { value: '31-60', label: '31-60 hari' },
   { value: '61-90', label: '61-90 hari' },
   { value: '90+', label: '> 90 hari' },
+];
+
+const RECEIVABLE_STATUS_OPTIONS = [
+  { value: '', label: 'Belum Lunas' },
+  { value: 'paid', label: 'Sudah Lunas' },
+  { value: 'all', label: 'Semua' },
 ];
 
 const PAYMENT_METHODS = [
@@ -34,6 +42,8 @@ export default function AccountsReceivable() {
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentInitial, setPaymentInitial] = useState(null);
+  const [printInvoice, setPrintInvoice] = useState(null);
+  const [printingInvoiceId, setPrintingInvoiceId] = useState('');
 
   useEffect(() => {
     fetchReceivables();
@@ -83,6 +93,37 @@ export default function AccountsReceivable() {
       return;
     }
     openPaymentForm(paymentInitialData);
+  };
+
+  const handlePrintInvoice = async (row) => {
+    const invoiceId = extractInvoiceId(row);
+    setPrintingInvoiceId(String(invoiceId || row?._id || row?.id || ''));
+
+    try {
+      if (!invoiceId) {
+        throw new Error('missing-invoice-id');
+      }
+
+      const response = await financeService.getInvoiceById(invoiceId);
+      const invoice = response?.data?.data || response?.data;
+      if (!invoice) {
+        throw new Error('missing-invoice-data');
+      }
+
+      setPrintInvoice(invoice);
+      setTimeout(() => window.print(), 300);
+    } catch {
+      const fallbackInvoice = buildPrintableInvoiceFallback(row);
+      if (!fallbackInvoice) {
+        toast.error('Detail invoice tidak tersedia untuk dicetak');
+        return;
+      }
+
+      setPrintInvoice(fallbackInvoice);
+      setTimeout(() => window.print(), 300);
+    } finally {
+      setTimeout(() => setPrintingInvoiceId(''), 350);
+    }
   };
 
   return (
@@ -135,8 +176,17 @@ export default function AccountsReceivable() {
             />
           </div>
           <select
+            value={filters.status || ''}
+            onChange={(e) => setFilters({ status: e.target.value, page: 1 })}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
+          >
+            {RECEIVABLE_STATUS_OPTIONS.map((option) => (
+              <option key={option.value || 'unpaid'} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <select
             value={filters.aging}
-            onChange={(e) => setFilters({ aging: e.target.value })}
+            onChange={(e) => setFilters({ aging: e.target.value, page: 1 })}
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
           >
             {AGING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -144,13 +194,13 @@ export default function AccountsReceivable() {
           <input
             type="date"
             value={filters.dateFrom}
-            onChange={(e) => setFilters({ dateFrom: e.target.value })}
+            onChange={(e) => setFilters({ dateFrom: e.target.value, page: 1 })}
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
           />
           <input
             type="date"
             value={filters.dateTo}
-            onChange={(e) => setFilters({ dateTo: e.target.value })}
+            onChange={(e) => setFilters({ dateTo: e.target.value, page: 1 })}
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
           />
         </div>
@@ -186,9 +236,15 @@ export default function AccountsReceivable() {
               ) : (
                 receivables.map((r) => (
                   <tr key={r._id || r.id || r.invoiceNumber} className="hover:bg-gray-50/50 transition-colors">
+                    {(() => {
+                      const remainingAmount = getReceivableRemainingAmount(r);
+                      const isPaid = isReceivablePaid(r);
+
+                      return (
+                        <>
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-gray-900">{r.invoiceNumber || r._id || '-'}</p>
-                      <p className="text-xs text-gray-400">Status: {r.status || '-'}</p>
+                      <p className="text-xs text-gray-400">Status: {isPaid ? 'paid' : (r.status || '-')}</p>
                     </td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
                       <p className="text-gray-800 truncate">{r.customerId?.name || '-'}</p>
@@ -198,21 +254,44 @@ export default function AccountsReceivable() {
                     <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">{formatDate(r.dueDate)}</td>
                     <td className="px-5 py-3.5 text-right text-gray-600 hidden xl:table-cell">{formatCurrency(r.totalAmount)}</td>
                     <td className="px-5 py-3.5 text-right text-gray-600 hidden xl:table-cell">{formatCurrency(r.paidAmount)}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">{formatCurrency(r.remainingAmount)}</td>
+                    <td className={`px-5 py-3.5 text-right font-semibold ${isPaid ? 'text-emerald-700' : 'text-gray-900'}`}>
+                      {isPaid ? 'Lunas' : formatCurrency(remainingAmount)}
+                    </td>
                     <td className="px-5 py-3.5 text-center hidden md:table-cell">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${Number(r.daysOverdue || 0) > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                        {Number(r.daysOverdue || 0) > 0 ? `${r.daysOverdue} hari` : 'Lancar'}
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${isPaid ? 'bg-blue-50 text-blue-700 border-blue-200' : Number(r.daysOverdue || 0) > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                        {isPaid ? 'Lunas' : Number(r.daysOverdue || 0) > 0 ? `${r.daysOverdue} hari` : 'Lancar'}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickPay(r)}
-                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
-                      >
-                        Bayar
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {!isPaid && (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickPay(r)}
+                            className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                            title="Bayar"
+                          >
+                            <CircleDollarSign size={16} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handlePrintInvoice(r)}
+                          disabled={printingInvoiceId === String(extractInvoiceId(r) || r?._id || r?.id || '')}
+                          className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Cetak Invoice"
+                        >
+                          {printingInvoiceId === String(extractInvoiceId(r) || r?._id || r?.id || '') ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Printer size={16} />
+                          )}
+                        </button>
+                      </div>
                     </td>
+                        </>
+                      );
+                    })()}
                   </tr>
                 ))
               )}
@@ -226,6 +305,8 @@ export default function AccountsReceivable() {
           label="piutang"
         />
       </div>
+
+      <InvoicePrintTemplate invoice={printInvoice} />
 
       {showPaymentForm && (
         <ReceivablePaymentModal
@@ -403,9 +484,6 @@ function debounce(fn, ms) {
 function extractInvoiceId(row) {
   if (!row) return '';
 
-  if (typeof row?._id === 'string' && row._id) return row._id;
-  if (typeof row?.id === 'string' && row.id) return row.id;
-
   const direct =
     row.invoiceId
     || row.salesInvoiceId
@@ -414,6 +492,9 @@ function extractInvoiceId(row) {
 
   if (typeof direct === 'string' && direct) return direct;
   if (direct && typeof direct === 'object' && direct._id) return direct._id;
+
+  if (typeof row?._id === 'string' && row._id) return row._id;
+  if (typeof row?.id === 'string' && row.id) return row.id;
 
   const invoices = Array.isArray(row.invoices) ? row.invoices : [];
   const firstInvoice = invoices.find((inv) => (inv?.remainingAmount ?? inv?.outstandingAmount ?? 0) > 0) || invoices[0];
@@ -444,5 +525,43 @@ function buildInitialReceivablePaymentData(row) {
     notes: referenceNumber
       ? `Pembayaran piutang invoice ${referenceNumber}${customerName ? ` (${customerName})` : ''}`
       : '',
+  };
+}
+
+function getReceivableRemainingAmount(row) {
+  return Number(row?.remainingAmount ?? row?.totalOutstanding ?? 0);
+}
+
+function isReceivablePaid(row) {
+  return String(row?.status || '').toLowerCase() === 'paid' || getReceivableRemainingAmount(row) <= 0;
+}
+
+function buildPrintableInvoiceFallback(row) {
+  if (!row) return null;
+
+  const customer = row?.customerId && typeof row.customerId === 'object'
+    ? row.customerId
+    : row?.customer && typeof row.customer === 'object'
+      ? row.customer
+      : null;
+
+  return {
+    _id: extractInvoiceId(row) || row?._id || row?.id || '',
+    invoiceNumber: row?.invoiceNumber || row?.referenceNumber || '-',
+    invoiceDate: row?.invoiceDate || row?.createdAt || null,
+    dueDate: row?.dueDate || null,
+    paymentTermDays: row?.paymentTermDays || 30,
+    status: row?.status || '',
+    customer,
+    items: Array.isArray(row?.items) ? row.items : [],
+    subtotal: Number(row?.subtotal ?? row?.totalAmount ?? 0),
+    discount: Number(row?.discount ?? 0),
+    ppnRate: Number(row?.ppnRate ?? 11),
+    ppnAmount: Number(row?.ppnAmount ?? 0),
+    totalAmount: Number(row?.totalAmount ?? row?.totalOutstanding ?? 0),
+    paidAmount: Number(row?.paidAmount ?? 0),
+    remainingAmount: getReceivableRemainingAmount(row),
+    salesOrders: Array.isArray(row?.salesOrders) ? row.salesOrders : [],
+    salesOrderIds: Array.isArray(row?.salesOrderIds) ? row.salesOrderIds : [],
   };
 }

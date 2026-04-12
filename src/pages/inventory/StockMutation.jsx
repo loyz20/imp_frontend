@@ -66,9 +66,9 @@ export default function StockMutation() {
       const aTime = new Date(a?.mutationDate || a?.createdAt || 0).getTime();
       const bTime = new Date(b?.mutationDate || b?.createdAt || 0).getTime();
       if (aTime === bTime) {
-        return new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime();
+        return new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime();
       }
-      return aTime - bTime;
+      return bTime - aTime;
     });
   }, [mutations]);
 

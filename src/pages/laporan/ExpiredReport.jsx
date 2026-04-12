@@ -134,11 +134,14 @@ export default function ExpiredReport() {
           className="px-3 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
         >
           <option value="">Semua Golongan</option>
+          <option value="prekursor">Prekursor</option>
+          <option value="obat_tertentu">Obat Tertentu</option>
           <option value="obat_keras">Obat Keras</option>
           <option value="obat_bebas">Obat Bebas</option>
           <option value="obat_bebas_terbatas">Obat Bebas Terbatas</option>
-          <option value="narkotika">Narkotika</option>
-          <option value="psikotropika">Psikotropika</option>
+          <option value="suplemen">Suplemen</option>
+          <option value="obat_tradisional">Obat Tradisional</option>
+          <option value="lainnya">Lainnya</option>
         </select>
       </ReportExportBar>
 

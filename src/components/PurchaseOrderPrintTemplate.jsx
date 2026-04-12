@@ -207,7 +207,7 @@ function resolveSupplierAddress(order, supplier) {
 
 function resolveOrderItemType(order, items = []) {
   const poCategory = String(order?.poCategory || order?.category || '').toLowerCase();
-  if (poCategory.includes('alkes')) return 'alkes';
+  if (poCategory.includes('alkes') || poCategory.includes('alat_kesehatan')) return 'alkes';
   if (poCategory.includes('obat')) return 'obat';
 
   const categories = items
@@ -224,7 +224,7 @@ function resolveOrderItemType(order, items = []) {
     })
     .filter(Boolean);
 
-  const hasAlkes = categories.some((c) => c.includes('alkes'));
+  const hasAlkes = categories.some((c) => c.includes('alkes') || c.includes('alat_kesehatan'));
   const hasObat = categories.some((c) => c.includes('obat'));
   const hasAlkesGolongan = golonganValues.some((g) => g.includes('elektromedik') || g.includes('alkes'));
 

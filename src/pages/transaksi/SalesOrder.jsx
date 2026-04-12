@@ -302,7 +302,7 @@ export default function SalesOrder() {
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. SO</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Pelanggan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Order</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">Estimasi Kirim</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">No Invoice</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Total Item</th>
                 <th className="text-center px-5 py-3.5 font-semibold text-gray-600">Status</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Aksi</th>
@@ -361,7 +361,7 @@ export default function SalesOrder() {
                         {formatDate(order.orderDate)}
                       </td>
                       <td className="px-5 py-3.5 text-gray-600 hidden xl:table-cell">
-                        {formatDate(order.expectedDeliveryDate)}
+                        {getOrderInvoiceFakturNumber(order)}
                       </td>
                       <td className="px-5 py-3.5 text-right text-gray-600 hidden lg:table-cell">
                         {order.items?.length || 0} item
@@ -465,7 +465,8 @@ function SOFormModal({ order, onClose, onSaved }) {
     if (!productId || stockMap[productId]) return;
     try {
       const res = await inventoryService.getProductBatches(productId, { sortBy: 'expiryDate', order: 'asc', availableOnly: true });
-      const batches = res.data?.data || res.data || [];
+      const rawBatches = res.data?.data || res.data || [];
+      const batches = getUsableFefoBatches(rawBatches);
       const totalStock = batches.reduce((sum, b) => sum + (b.availableQuantity ?? b.availableQty ?? b.quantity ?? 0), 0);
       setStockMap((prev) => ({ ...prev, [productId]: { totalStock, batches } }));
     } catch {
@@ -512,7 +513,7 @@ function SOFormModal({ order, onClose, onSaved }) {
       return { items, addedCount: 0, hasRemainder: false };
     }
 
-    const batches = getFefoSortedBatches(stockMap[item.productId]?.batches || []);
+    const batches = getUsableFefoBatches(stockMap[item.productId]?.batches || []);
     const selectedIdx = batches.findIndex((batch) => (
       getBatchOptionValue(batch) === String(item.batchRef || '')
       || String(batch.batchNumber || '') === String(item.batchNumber || '')
@@ -610,7 +611,7 @@ function SOFormModal({ order, onClose, onSaved }) {
         const productStock = stockMap[item.productId];
         if (!productStock?.batches?.length) continue;
 
-        const fefoBatches = getFefoSortedBatches(productStock.batches);
+        const fefoBatches = getUsableFefoBatches(productStock.batches);
         const firstAvailableBatch = fefoBatches.find((batch) => getBatchAvailableQty(batch) > 0);
         const selected = findBatchByValue(fefoBatches, item.batchRef || item.batchNumber);
 
@@ -927,16 +928,6 @@ function SOFormModal({ order, onClose, onSaved }) {
                 value={form.orderDate}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Estimasi Pengiriman</label>
-              <input
-                type="date"
-                name="expectedDeliveryDate"
-                value={form.expectedDeliveryDate}
-                onChange={handleChange}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
               />
             </div>
@@ -1345,6 +1336,7 @@ function SODetailModal({ order, onClose }) {
               <div className="space-y-1 text-sm">
                 <p className="text-gray-600">Term: <span className="font-medium text-gray-800">{order.paymentTermDays ?? 30} hari</span></p>
                 <p className="text-gray-600">No Surat Jalan: <span className="font-medium text-gray-800">{getOrderSuratJalanNumber(order)}</span></p>
+                <p className="text-gray-600">No Invoice: <span className="font-medium text-gray-800">{getOrderInvoiceFakturNumber(order)}</span></p>
                 {order.expectedDeliveryDate && (
                   <p className="text-gray-600">Estimasi kirim: <span className="font-medium text-gray-800">{formatDate(order.expectedDeliveryDate)}</span></p>
                 )}
@@ -1618,6 +1610,22 @@ function getFefoSortedBatches(batches) {
   });
 }
 
+function isBatchExpired(batch, now = new Date()) {
+  const expiryRaw = batch?.expiryDate;
+  if (!expiryRaw) return false;
+
+  const expiry = new Date(expiryRaw);
+  if (Number.isNaN(expiry.getTime())) return false;
+
+  const endOfExpiryDay = new Date(expiry);
+  endOfExpiryDay.setHours(23, 59, 59, 999);
+  return endOfExpiryDay < now;
+}
+
+function getUsableFefoBatches(batches) {
+  return getFefoSortedBatches(batches).filter((batch) => !isBatchExpired(batch));
+}
+
 function findBatchByValue(batches, value) {
   if (!value) return null;
   const key = String(value);
@@ -1638,7 +1646,7 @@ function getSelectableBatchesForItem(items, index, batches) {
       .filter(Boolean),
   );
 
-  return getFefoSortedBatches(batches).filter((batch) => {
+  return getUsableFefoBatches(batches).filter((batch) => {
     const optionValue = String(getBatchOptionValue(batch));
     const batchNumber = String(batch?.batchNumber || '');
     const availableQty = getBatchAvailableQty(batch);
@@ -1714,10 +1722,7 @@ function getAllowedStatusTransitions(status) {
     shipped: [
       { value: 'returned', label: 'Diretur' },
     ],
-    awaiting_payment: [
-      { value: 'completed', label: 'Selesai' },
-      { value: 'returned', label: 'Diretur' },
-    ],
+    awaiting_payment: [],
     completed: [],
     returned: [],
     canceled: [],
@@ -1734,4 +1739,18 @@ function getOrderSuratJalanNumber(order) {
     || order?.fakturNumber
     || order?.noFaktur
     || '-';
+}
+
+function getOrderInvoiceFakturNumber(order) {
+  const firstInvoice = Array.isArray(order?.invoices) ? order.invoices[0] : null;
+
+  return order?.invoiceNumber
+    || order?.noInvoice
+    || order?.fakturNumber
+    || order?.noFaktur
+    || order?.invoice?.invoiceNumber
+    || order?.invoice?.fakturNumber
+    || firstInvoice?.invoiceNumber
+    || firstInvoice?.fakturNumber
+    || 'Belum dibuat';
 }
