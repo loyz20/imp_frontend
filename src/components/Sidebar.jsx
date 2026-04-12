@@ -105,10 +105,18 @@ export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation();
   const settings = useSettingsStore((s) => s.settings);
   const companyName = settings?.company?.name || 'PT. IKO Farma';
+  const companyLogo = settings?.company?.logo || null;
+  const companyPhone = settings?.company?.phone || null;
+  const companyEmail = settings?.company?.email || null;
   const hasCdob = settings?.company?.licenses?.cdob?.number;
 
   const toggleMenu = (name) => {
-    setOpenMenus((prev) => ({ ...prev, [name]: !prev[name] }));
+    if (collapsed) {
+      onToggle();
+      setOpenMenus({ [name]: true });
+    } else {
+      setOpenMenus((prev) => ({ ...prev, [name]: !prev[name] }));
+    }
   };
 
   const isChildActive = (children) =>
@@ -146,7 +154,15 @@ export default function Sidebar({ collapsed, onToggle }) {
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <span className="text-emerald-600">{Icons.logo}</span>
+            {companyLogo ? (
+              <img
+                src={companyLogo}
+                alt={companyName}
+                className="w-8 h-8 rounded-lg object-contain shrink-0"
+              />
+            ) : (
+              <span className="text-emerald-600">{Icons.logo}</span>
+            )}
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-base font-bold text-gray-900 tracking-tight leading-tight">
@@ -214,6 +230,8 @@ export default function Sidebar({ collapsed, onToggle }) {
                       ))}
                     </div>
                   )}
+
+
                 </div>
               );
             }
@@ -247,7 +265,9 @@ export default function Sidebar({ collapsed, onToggle }) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-800 truncate">{companyName}</p>
-                <p className="text-[10px] text-gray-500">{hasCdob ? 'CDOB Certified' : 'PBF'}</p>
+                <p className="text-[10px] text-gray-500 truncate">{hasCdob ? 'CDOB Certified' : 'PBF'}</p>
+                {companyPhone && <p className="text-[10px] text-gray-400 truncate">{companyPhone}</p>}
+                {companyEmail && <p className="text-[10px] text-gray-400 truncate">{companyEmail}</p>}
               </div>
             </div>
           </div>

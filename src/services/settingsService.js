@@ -15,6 +15,10 @@ const settingsService = {
 
   updatePharmacist: (data) => apiClient.put('/settings/pharmacist', data),
 
+  updatePharmacistObat: (data) => apiClient.put('/settings/pharmacist-obat', data),
+
+  updatePharmacistAlkes: (data) => apiClient.put('/settings/pharmacist-alkes', data),
+
   updateTax: (data) => apiClient.put('/settings/tax', data),
 
   updateInvoice: (data) => apiClient.put('/settings/invoice', data),

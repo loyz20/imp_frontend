@@ -38,8 +38,9 @@ const useCustomerStore = create((set, get) => ({
       if (filters.sort) params.sort = filters.sort;
 
       const { data } = await customerService.getAll(params);
+      const customerList = Array.isArray(data?.data) ? data.data : [];
       set({
-        customers: data.data,
+        customers: customerList,
         pagination: data.meta?.pagination || null,
         isLoading: false,
       });

@@ -2,198 +2,161 @@ import React from 'react';
 import useSettings from '../hooks/useSettings';
 
 export default function PurchaseOrderPrintTemplate({ order }) {
-  const { company, tax } = useSettings();
+  const { company } = useSettings();
 
   if (!order) return null;
 
   const addr = company.officeAddress || {};
-  const companyAddress = [addr.street, addr.city, addr.province, addr.postalCode].filter(Boolean).join(', ');
+  const addrLine1 = addr.street || '';
+  const addrLine2 = [addr.city, addr.province, addr.postalCode].filter(Boolean).join(', ');
+  const companyAddress = [addrLine1, addrLine2].filter(Boolean).join(', ');
+  const licenses = company.licenses || {};
+  const legacyPharmacist = company.responsiblePharmacist || {};
+  const pharmacistObat = company.responsiblePharmacistObat || company.pharmacistObat || legacyPharmacist;
+  const pharmacistAlkes = company.responsiblePharmacistAlkes || company.pharmacistAlkes || legacyPharmacist;
+
   const co = {
     name: company.name || 'PBF',
-    tagline: 'Pedagang Besar Farmasi',
+    logo: company.logo || null,
+    addrLine1,
+    addrLine2,
     address: companyAddress || '-',
     phone: company.phone || '-',
     email: company.email || '-',
-    npwp: tax.npwp || '-',
+    pbfLicense: licenses.pbf?.number || '-',
+    cdobCertificate: licenses.cdob?.number || '-',
   };
 
-  const supplier = order.supplier || order.supplierId || {};
-  const supplierAddressObj = supplier.address || {};
-  const supplierAddress = [
-    supplierAddressObj.street,
-    supplierAddressObj.city,
-    supplierAddressObj.province,
-    supplierAddressObj.postalCode,
-  ].filter(Boolean).join(', ');
+  const supplier = resolveSupplier(order);
+  const supplierName = supplier?.name || order.supplierName || '-';
+  const supplierAddress = resolveSupplierAddress(order, supplier);
 
   const items = order.items || [];
-  const subtotal = items.reduce((sum, item) => {
-    const qty = Number(item.quantity) || 0;
-    const unitPrice = Number(item.unitPrice) || 0;
-    const discount = Number(item.discount) || 0;
-    const itemSubtotal = qty * unitPrice;
-    return sum + (itemSubtotal - (itemSubtotal * discount / 100));
-  }, 0);
+  const orderItemType = resolveOrderItemType(order, items);
+  const pharmacist = orderItemType === 'alkes' ? pharmacistAlkes : pharmacistObat;
+  const showPriceColumns = items.some((item) => (Number(item?.unitPrice) || 0) > 0);
+  const minRows = 14;
+  const rows = Array.from({ length: Math.max(items.length, minRows) }, (_, i) => items[i] || null);
+  const locationDate = `${addr.city || '-'}, ${fmtDate(order.orderDate || new Date())}`;
 
-  const totalAmount = Number(order.totalAmount) || subtotal;
+  const orderSubtotal = Number(order.subtotal) || items.reduce((sum, item) => {
+    const qty = Number(item?.quantity) || 0;
+    const up = Number(item?.unitPrice) || 0;
+    const disc = Number(item?.discount) || 0;
+    const sub = qty * up;
+    return sum + (sub - (sub * disc / 100));
+  }, 0);
+  const ppnAmount = Number(order.ppnAmount) || 0;
+  const ppnRate = Number(order.ppnRate) || 0;
+  const grandTotal = Number(order.totalAmount) || (orderSubtotal + ppnAmount);
 
   return (
     <div className="invoice-print-template hidden print:block!">
-      <div className="invoice-page">
-        <div className="invoice-header">
-          <div className="invoice-header-left">
-            <h1 className="invoice-company-name">{co.name}</h1>
-            <p className="invoice-company-tagline">{co.tagline}</p>
-            <p className="invoice-company-detail">{co.address}</p>
-            <p className="invoice-company-detail">Telp: {co.phone} · Email: {co.email}</p>
-            <p className="invoice-company-detail">NPWP: {co.npwp}</p>
-          </div>
-          <div className="invoice-header-right">
-            <h2 className="invoice-title">PURCHASE ORDER</h2>
-            <p className="invoice-title-sub">SURAT PESANAN PEMBELIAN</p>
-          </div>
-        </div>
-
-        <div className="invoice-divider-bold" />
-
-        <div className="invoice-meta">
-          <div className="invoice-meta-left">
-            <p className="invoice-meta-label">Kepada Yth:</p>
-            <p className="invoice-meta-value font-semibold">{supplier.name || '-'}</p>
-            {supplierAddress && <p className="invoice-meta-value">{supplierAddress}</p>}
-            {supplier.phone && <p className="invoice-meta-value">Telp: {supplier.phone}</p>}
-            {supplier.picName && <p className="invoice-meta-value">PIC: {supplier.picName}</p>}
-          </div>
-          <div className="invoice-meta-right">
-            <table className="invoice-meta-table">
-              <tbody>
-                <tr>
-                  <td className="invoice-meta-td-label">No. PO</td>
-                  <td className="invoice-meta-td-sep">:</td>
-                  <td className="invoice-meta-td-value font-semibold">{order.poNumber || '-'}</td>
-                </tr>
-                <tr>
-                  <td className="invoice-meta-td-label">Tanggal PO</td>
-                  <td className="invoice-meta-td-sep">:</td>
-                  <td className="invoice-meta-td-value">{fmtDate(order.orderDate)}</td>
-                </tr>
-                <tr>
-                  <td className="invoice-meta-td-label">Estimasi Kirim</td>
-                  <td className="invoice-meta-td-sep">:</td>
-                  <td className="invoice-meta-td-value">{fmtDate(order.expectedDeliveryDate)}</td>
-                </tr>
-                <tr>
-                  <td className="invoice-meta-td-label">Term Bayar</td>
-                  <td className="invoice-meta-td-sep">:</td>
-                  <td className="invoice-meta-td-value">
-                    {Number(order.paymentTermDays) === 0 ? 'COD' : `Net ${order.paymentTermDays || 30} hari`}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="invoice-meta-td-label">Status</td>
-                  <td className="invoice-meta-td-sep">:</td>
-                  <td className="invoice-meta-td-value">{formatStatus(order.status)}</td>
-                </tr>
-              </tbody>
-            </table>
+      <div className="invoice-page po-letter-page">
+        <div className="po-letter-head">
+          {co.logo && (
+            <img src={co.logo} alt={co.name} className="po-letter-logo-img" />
+          )}
+          <div className="po-letter-head-info">
+            <h1 className="po-letter-company">{co.name}</h1>
+            <div className="po-letter-head-row">
+              <span>{co.addrLine1}</span>
+              <span>Email : {co.email}</span>
+            </div>
+            <div className="po-letter-head-row">
+              <span>{co.addrLine2}</span>
+              <span>No Telp : {co.phone}</span>
+            </div>
+            <p className="po-letter-head-line">Ijin PBF : {co.pbfLicense} &nbsp;&nbsp;&nbsp; Sertifikat CDOB : {co.cdobCertificate}</p>
           </div>
         </div>
 
-        <table className="invoice-table">
+        <div className="po-letter-title-wrap">
+          <h2 className="po-letter-title">SURAT PESANAN</h2>
+          <p className="po-letter-number">Nomor : {order.poNumber || '-'}</p>
+        </div>
+
+        <div className="po-letter-recipient">
+          <p className="po-letter-line">
+            <span className="po-letter-label">Kepada Yth.</span>
+            <span className="po-letter-value">{supplierName}</span>
+          </p>
+          <p className="po-letter-line">
+            <span className="po-letter-label">Alamat</span>
+            <span className="po-letter-value">{supplierAddress || '-'}</span>
+          </p>
+        </div>
+
+        <p className="po-letter-open">Dengan ini mengajukan pesanan barang sebagai berikut :</p>
+
+        <table className={`po-letter-table ${showPriceColumns ? 'po-letter-table-pricing' : ''}`}>
           <thead>
             <tr>
-              <th className="invoice-th invoice-th-no">No</th>
-              <th className="invoice-th invoice-th-product">Nama Produk</th>
-              <th className="invoice-th invoice-th-unit">Satuan</th>
-              <th className="invoice-th invoice-th-qty">Qty</th>
-              <th className="invoice-th invoice-th-price">Harga Satuan</th>
-              <th className="invoice-th invoice-th-qty">Disc %</th>
-              <th className="invoice-th invoice-th-subtotal">Subtotal</th>
+              <th className="po-col-no">No</th>
+              <th className="po-col-name">Nama Barang</th>
+              <th className="po-col-qty">Jumlah</th>
+              <th className="po-col-unit">Satuan</th>
+              {showPriceColumns && <th className="po-col-price">Harga</th>}
+              {showPriceColumns && <th className="po-col-disc">Diskon</th>}
+              {showPriceColumns && <th className="po-col-subtotal">Subtotal</th>}
             </tr>
           </thead>
           <tbody>
-            {items.length > 0 ? items.map((item, i) => {
-              const qty = Number(item.quantity) || 0;
-              const unitPrice = Number(item.unitPrice) || 0;
-              const discount = Number(item.discount) || 0;
+            {rows.map((item, idx) => {
+              const qty = Number(item?.quantity) || 0;
+              const unitPrice = Number(item?.unitPrice) || 0;
+              const discount = Number(item?.discount) || 0;
               const itemSubtotal = qty * unitPrice;
               const itemTotal = itemSubtotal - (itemSubtotal * discount / 100);
+
               return (
-                <tr key={i} className="invoice-tr">
-                  <td className="invoice-td invoice-td-center">{i + 1}</td>
-                  <td className="invoice-td">{item.product?.name || item.productId?.name || item.productName || '-'}</td>
-                  <td className="invoice-td invoice-td-center">{item.satuan || 'pcs'}</td>
-                  <td className="invoice-td invoice-td-right">{qty}</td>
-                  <td className="invoice-td invoice-td-right">{fmtCurrency(unitPrice)}</td>
-                  <td className="invoice-td invoice-td-right">{discount > 0 ? `${discount}%` : '-'}</td>
-                  <td className="invoice-td invoice-td-right">{fmtCurrency(itemTotal)}</td>
+                <tr key={idx}>
+                  <td className="po-cell-center">{item ? idx + 1 : ''}</td>
+                  <td>{item ? (item.product?.name || item.productId?.name || item.productName || '-') : ''}</td>
+                  <td className="po-cell-center">{item ? qty : ''}</td>
+                  <td className="po-cell-center">{item ? (item.satuan || item.unit || 'PCS') : ''}</td>
+                  {showPriceColumns && <td className="po-cell-right">{item ? (unitPrice > 0 ? fmtCurrency(unitPrice) : '-') : ''}</td>}
+                  {showPriceColumns && <td className="po-cell-center">{item ? (discount > 0 ? `${discount}%` : '-') : ''}</td>}
+                  {showPriceColumns && <td className="po-cell-right">{item ? (itemTotal > 0 ? fmtCurrency(itemTotal) : '-') : ''}</td>}
                 </tr>
               );
-            }) : (
-              <tr>
-                <td colSpan={7} className="invoice-td invoice-td-center" style={{ padding: '16px' }}>
-                  Tidak ada item
-                </td>
-              </tr>
-            )}
+            })}
           </tbody>
+          {showPriceColumns && (
+            <tfoot>
+              <tr>
+                <td colSpan={6} className="po-cell-foot-label">Total</td>
+                <td className="po-cell-right">{fmtCurrency(orderSubtotal)}</td>
+              </tr>
+              {ppnAmount > 0 && (
+                <tr>
+                  <td colSpan={6} className="po-cell-foot-label">PPN{ppnRate > 0 ? ` (${ppnRate}%)` : ''}</td>
+                  <td className="po-cell-right">{fmtCurrency(ppnAmount)}</td>
+                </tr>
+              )}
+              <tr className="po-row-grand-total">
+                <td colSpan={6} className="po-cell-foot-label">Grand Total</td>
+                <td className="po-cell-right">{fmtCurrency(grandTotal)}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
 
-        <div className="invoice-totals-row">
-          <div className="invoice-totals-note">
-            <p className="invoice-note-label">Terbilang:</p>
-            <p className="invoice-note-value"><em>{terbilang(totalAmount)} Rupiah</em></p>
-          </div>
-          <table className="invoice-totals-table">
-            <tbody>
-              <tr className="invoice-totals-grand">
-                <td className="invoice-totals-label font-bold">TOTAL PO</td>
-                <td className="invoice-totals-value font-bold">{fmtCurrency(totalAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="po-letter-notes">
+          <p className="po-letter-notes-title">Catatan :</p>
+          <p>{order.notes || '-'}</p>
         </div>
 
-        {order.notes && (
-          <div className="invoice-payment-info">
-            <p className="invoice-payment-title">Catatan PO:</p>
-            <p className="invoice-payment-detail">{order.notes}</p>
-          </div>
-        )}
-
-        <div className="invoice-signatures">
-          <div className="invoice-sig-box">
-            <p className="invoice-sig-title">Dibuat oleh,</p>
-            <div className="invoice-sig-space" />
-            <p className="invoice-sig-line" />
-            <p className="invoice-sig-role">Purchasing</p>
-          </div>
-          <div className="invoice-sig-box">
-            <p className="invoice-sig-title">Disetujui oleh,</p>
-            <div className="invoice-sig-space" />
-            <p className="invoice-sig-line" />
-            <p className="invoice-sig-role">Manajer / Apoteker</p>
-          </div>
-          <div className="invoice-sig-box">
-            <p className="invoice-sig-title">Diterima supplier,</p>
-            <div className="invoice-sig-space" />
-            <p className="invoice-sig-line" />
-            <p className="invoice-sig-role">Supplier</p>
-          </div>
-        </div>
-
-        <div className="invoice-footer">
-          <p>Dokumen ini sah dan diproses secara elektronik.</p>
-          <p>Dicetak pada: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+        <div className="po-letter-signature">
+          <p>{locationDate}</p>
+          <p>{orderItemType === 'alkes' ? 'Penanggung Jawab Alat Kesehatan' : 'Apoteker Penanggung Jawab'}</p>
+          <div className="po-letter-sign-space" />
+          <p className="po-letter-signer-name">{pharmacist.name || '-'}</p>
+          <p>SIPA : {pharmacist.sipaNumber || '-'}</p>
         </div>
       </div>
     </div>
   );
-}
-
-function fmtCurrency(amount) {
-  if (amount == null) return 'Rp 0';
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
 
 function fmtDate(dateStr) {
@@ -201,35 +164,70 @@ function fmtDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function formatStatus(status) {
-  const map = {
-    draft: 'Draft',
-    pending_approval: 'Menunggu Persetujuan',
-    approved: 'Disetujui',
-    sent: 'Dikirim ke Supplier',
-    partial_received: 'Diterima Sebagian',
-    received: 'Diterima Lengkap',
-    cancelled: 'Dibatalkan',
-  };
-  return map[status] || status || '-';
+function fmtCurrency(amount) {
+  if (amount == null) return 'Rp 0';
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-function terbilang(n) {
-  if (n == null || n === 0) return 'Nol';
-  const satuan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+function resolveSupplier(order) {
+  if (order?.supplier && typeof order.supplier === 'object') return order.supplier;
+  if (order?.supplierId && typeof order.supplierId === 'object') return order.supplierId;
+  return null;
+}
 
-  const convert = (num) => {
-    if (num < 12) return satuan[num];
-    if (num < 20) return satuan[num - 10] + ' Belas';
-    if (num < 100) return satuan[Math.floor(num / 10)] + ' Puluh' + (num % 10 > 0 ? ` ${satuan[num % 10]}` : '');
-    if (num < 200) return 'Seratus' + (num - 100 > 0 ? ` ${convert(num - 100)}` : '');
-    if (num < 1000) return satuan[Math.floor(num / 100)] + ' Ratus' + (num % 100 > 0 ? ` ${convert(num % 100)}` : '');
-    if (num < 2000) return 'Seribu' + (num - 1000 > 0 ? ` ${convert(num - 1000)}` : '');
-    if (num < 1000000) return convert(Math.floor(num / 1000)) + ' Ribu' + (num % 1000 > 0 ? ` ${convert(num % 1000)}` : '');
-    if (num < 1000000000) return convert(Math.floor(num / 1000000)) + ' Juta' + (num % 1000000 > 0 ? ` ${convert(num % 1000000)}` : '');
-    if (num < 1000000000000) return convert(Math.floor(num / 1000000000)) + ' Miliar' + (num % 1000000000 > 0 ? ` ${convert(num % 1000000000)}` : '');
-    return convert(Math.floor(num / 1000000000000)) + ' Triliun' + (num % 1000000000000 > 0 ? ` ${convert(num % 1000000000000)}` : '');
-  };
+function resolveSupplierAddress(order, supplier) {
+  if (typeof order?.supplierAddress === 'string' && order.supplierAddress.trim()) {
+    return order.supplierAddress.trim();
+  }
 
-  return convert(Math.floor(Math.abs(n)));
+  const rawAddress =
+    (supplier?.address && typeof supplier.address === 'object' && supplier.address) ||
+    (order?.supplierAddress && typeof order.supplierAddress === 'object' && order.supplierAddress) ||
+    {};
+
+  const street =
+    rawAddress.street ||
+    rawAddress.line1 ||
+    rawAddress.addressLine1 ||
+    supplier?.street ||
+    supplier?.addressLine1 ||
+    '';
+
+  const city = rawAddress.city || supplier?.city || '';
+  const province = rawAddress.province || supplier?.province || '';
+  const postalCode = rawAddress.postalCode || supplier?.postalCode || '';
+
+  return [street, city, province, postalCode].filter(Boolean).join(', ');
+}
+
+function resolveOrderItemType(order, items = []) {
+  const poCategory = String(order?.poCategory || order?.category || '').toLowerCase();
+  if (poCategory.includes('alkes')) return 'alkes';
+  if (poCategory.includes('obat')) return 'obat';
+
+  const categories = items
+    .map((item) => {
+      const product = item?.product || item?.productId || {};
+      return String(product?.category || product?.kategori || item?.category || item?.kategori || '').toLowerCase();
+    })
+    .filter(Boolean);
+
+  const golonganValues = items
+    .map((item) => {
+      const product = item?.product || item?.productId || {};
+      return String(product?.golongan || item?.golongan || '').toLowerCase();
+    })
+    .filter(Boolean);
+
+  const hasAlkes = categories.some((c) => c.includes('alkes'));
+  const hasObat = categories.some((c) => c.includes('obat'));
+  const hasAlkesGolongan = golonganValues.some((g) => g.includes('elektromedik') || g.includes('alkes'));
+
+  if ((hasAlkes && !hasObat) || hasAlkesGolongan) return 'alkes';
+  return 'obat';
 }

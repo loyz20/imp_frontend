@@ -28,6 +28,10 @@ const salesOrderService = {
   // Change SO Status — PATCH /sales-orders/:id/status
   changeStatus: (id, status, notes) =>
     apiClient.patch(`/sales-orders/${id}/status`, { status, notes }),
+
+  // Generate Sales Invoice from multiple SOs — POST /sales-orders/generate-invoice
+  generateInvoice: (salesOrderIds) =>
+    apiClient.post('/sales-orders/generate-invoice', { salesOrderIds }),
 };
 
 export default salesOrderService;

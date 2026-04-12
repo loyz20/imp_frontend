@@ -19,8 +19,6 @@ import {
 /* ── Constants ── */
 const PO_STATUS = [
   { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: FileText },
-  { value: 'pending_approval', label: 'Menunggu Persetujuan', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-  { value: 'approved', label: 'Disetujui', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: ThumbsUp },
   { value: 'sent', label: 'Dikirim ke Supplier', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Send },
   { value: 'partial_received', label: 'Diterima Sebagian', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: Package },
   { value: 'received', label: 'Diterima Lengkap', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle },
@@ -31,7 +29,6 @@ const STATUS_MAP = Object.fromEntries(PO_STATUS.map((s) => [s.value, s]));
 
 /* ── Role helpers ── */
 const CAN_CRUD_ROLES = ['superadmin', 'admin', 'apoteker'];
-const CAN_APPROVE_ROLES = ['superadmin', 'admin'];
 const CAN_DELETE_ROLES = ['superadmin', 'admin'];
 
 /* ═══════════════════════════════════════
@@ -44,11 +41,10 @@ export default function PurchaseOrder() {
   } = usePurchaseOrderStore();
   const currentUser = useAuthStore((s) => s.user);
   const userRole = currentUser?.role || '';
-  const { requirePOApproval, getDocPrefix } = useSettings();
+  const { getDocPrefix } = useSettings();
   const poPrefix = getDocPrefix('purchaseOrder');
 
   const canCrud = CAN_CRUD_ROLES.includes(userRole);
-  const canApprove = CAN_APPROVE_ROLES.includes(userRole);
   const canDelete = CAN_DELETE_ROLES.includes(userRole);
 
   const [showForm, setShowForm] = useState(false);
@@ -56,7 +52,6 @@ export default function PurchaseOrder() {
   const [showDetail, setShowDetail] = useState(null);
   const [printOrder, setPrintOrder] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [approvalModal, setApprovalModal] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -87,29 +82,12 @@ export default function PurchaseOrder() {
 
   const handleSubmitForApproval = async (order) => {
     try {
-      if (requirePOApproval) {
-        await changeStatus(oid(order), 'pending_approval');
-        toast.success('PO berhasil diajukan untuk persetujuan');
-      } else {
-        // Tanpa approval — langsung approved
-        await changeStatus(oid(order), 'approved');
-        toast.success('PO berhasil disetujui (approval tidak diperlukan)');
-      }
-      fetchOrders();
-      fetchStats();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal memproses PO');
-    }
-  };
-
-  const handleSendToSupplier = async (order) => {
-    try {
       await changeStatus(oid(order), 'sent');
       toast.success('PO berhasil dikirim ke supplier');
       fetchOrders();
       fetchStats();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal mengirim PO');
+      toast.error(err.response?.data?.message || 'Gagal memproses PO');
     }
   };
 
@@ -133,7 +111,7 @@ export default function PurchaseOrder() {
           <p className="text-sm text-gray-500 mt-1">
             Kelola surat pesanan pembelian obat dan alkes ke supplier.
             {poPrefix && <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">Prefix: {poPrefix}</span>}
-            {!requirePOApproval && <span className="ml-1 text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">Tanpa Approval</span>}
+            <span className="ml-1 text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">Auto Kirim ke Supplier</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -154,8 +132,8 @@ export default function PurchaseOrder() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             { label: 'Total PO', value: stats.total ?? 0, color: 'from-indigo-500 to-indigo-600', icon: ClipboardList },
-            { label: 'Menunggu Persetujuan', value: stats.pendingApproval ?? 0, color: 'from-amber-500 to-amber-600', icon: Clock },
             { label: 'Dikirim', value: stats.sent ?? 0, color: 'from-blue-500 to-blue-600', icon: Send },
+            { label: 'Diterima', value: stats.received ?? 0, color: 'from-teal-500 to-teal-600', icon: CheckCircle },
             { label: 'Total Nilai', value: formatCurrency(stats.totalValue ?? 0), color: 'from-emerald-500 to-emerald-600', icon: CircleDollarSign, isText: true },
           ].map((s) => {
             const Icon = s.icon;
@@ -315,39 +293,11 @@ export default function PurchaseOrder() {
                               <button
                                 onClick={() => handleSubmitForApproval(order)}
                                 className="p-2 rounded-lg hover:bg-amber-50 text-gray-400 hover:text-amber-600 transition-colors"
-                                title={requirePOApproval ? 'Ajukan Persetujuan' : 'Setujui Langsung'}
+                                title="Kirim ke Supplier"
                               >
-                                {requirePOApproval ? <Send size={16} /> : <Check size={16} />}
+                                <Send size={16} />
                               </button>
                             </>
-                          )}
-                          {requirePOApproval && canApprove && order.status === 'pending_approval' && (
-                            (() => {
-                              const creatorId = typeof order.createdBy === 'object' ? order.createdBy?._id : order.createdBy;
-                              const isSelfCreated = creatorId && creatorId === currentUser?._id;
-                              return isSelfCreated ? (
-                                <span className="p-2 text-gray-300 cursor-not-allowed" title="Tidak dapat menyetujui PO yang dibuat sendiri">
-                                  <ThumbsUp size={16} />
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => setApprovalModal(order)}
-                                  className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
-                                  title="Setujui / Tolak"
-                                >
-                                  <ThumbsUp size={16} />
-                                </button>
-                              );
-                            })()
-                          )}
-                          {canCrud && order.status === 'approved' && (
-                            <button
-                              onClick={() => handleSendToSupplier(order)}
-                              className="p-2 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors"
-                              title="Kirim ke Supplier"
-                            >
-                              <Send size={16} />
-                            </button>
                           )}
                           {canDelete && (order.status === 'draft' || order.status === 'cancelled') && (
                             <button
@@ -389,13 +339,6 @@ export default function PurchaseOrder() {
       )}
       {showDetail && <PODetailModal order={showDetail} onClose={() => setShowDetail(null)} />}
       {deleteConfirm && <DeleteConfirmModal order={deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={handleDelete} />}
-      {approvalModal && (
-        <ApprovalModal
-          order={approvalModal}
-          onClose={() => setApprovalModal(null)}
-          onApproved={() => { setApprovalModal(null); fetchOrders(); fetchStats(); }}
-        />
-      )}
     </div>
   );
 }
@@ -405,10 +348,12 @@ export default function PurchaseOrder() {
    ═══════════════════════════════════════ */
 function POFormModal({ order, onClose, onSaved }) {
   const { createOrder, updateOrder } = usePurchaseOrderStore();
-  const { defaultPaymentTermDays, isAutoNumber } = useSettings();
+  const { defaultPaymentTermDays, isAutoNumber, ppnRate: defaultPpnRate } = useSettings();
   const autoNum = isAutoNumber('purchaseOrder');
   const isEdit = !!order;
   const [loading, setLoading] = useState(false);
+  const hasExistingPricing = (order?.items || []).some((item) => Number(item?.unitPrice || 0) > 0 || Number(item?.discount || 0) > 0);
+  const hasExistingPpn = Number(order?.ppnAmount || 0) > 0 || Number(order?.ppnRate || 0) > 0;
 
   const [form, setForm] = useState({
     poNumber: order?.poNumber || '',
@@ -417,6 +362,9 @@ function POFormModal({ order, onClose, onSaved }) {
     orderDate: order?.orderDate ? order.orderDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     expectedDeliveryDate: order?.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : '',
     paymentTermDays: order?.paymentTermDays ?? defaultPaymentTermDays ?? 30,
+    enablePricing: hasExistingPricing,
+    enablePpn: hasExistingPpn,
+    ppnRate: order?.ppnRate ?? defaultPpnRate ?? 11,
     notes: order?.notes || '',
     items: order?.items?.length
       ? order.items.map((item) => ({
@@ -433,8 +381,17 @@ function POFormModal({ order, onClose, onSaved }) {
   });
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((p) => {
+      if (name === 'enablePricing') {
+        return {
+          ...p,
+          enablePricing: checked,
+          enablePpn: checked ? p.enablePpn : false,
+        };
+      }
+      return { ...p, [name]: type === 'checkbox' ? checked : value };
+    });
   };
 
   const handleItemChange = (index, field, value) => {
@@ -457,11 +414,16 @@ function POFormModal({ order, onClose, onSaved }) {
   };
 
   const calculateItemTotal = (item) => {
+    if (!form.enablePricing) return 0;
     const subtotal = item.quantity * item.unitPrice;
     return subtotal - (subtotal * item.discount / 100);
   };
 
-  const grandTotal = form.items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+  const subtotalAmount = form.items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+  const calculatedPpnAmount = form.enablePricing && form.enablePpn
+    ? Math.round(subtotalAmount * Number(form.ppnRate || 0) / 100)
+    : 0;
+  const grandTotal = subtotalAmount + calculatedPpnAmount;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -480,21 +442,38 @@ function POFormModal({ order, onClose, onSaved }) {
     }
     setLoading(true);
     try {
+      const mappedItems = validItems.map((i) => {
+        const quantity = Number(i.quantity);
+        const unitPrice = form.enablePricing ? Number(i.unitPrice) : 0;
+        const discount = form.enablePricing ? Number(i.discount) : 0;
+        const lineSubtotal = quantity * unitPrice;
+        const lineTotal = lineSubtotal - (lineSubtotal * discount / 100);
+
+        return {
+          productId: i.productId,
+          satuan: i.satuan,
+          quantity,
+          unitPrice,
+          discount,
+          subtotal: Math.round(lineTotal),
+          notes: i.notes,
+        };
+      });
+      const subtotalAmount = mappedItems.reduce((sum, i) => sum + (i.subtotal || 0), 0);
+
       const payload = {
         ...(!autoNum && !isEdit && { poNumber: form.poNumber.trim() }),
         supplierId: form.supplierId,
         orderDate: form.orderDate,
         expectedDeliveryDate: form.expectedDeliveryDate || undefined,
         paymentTermDays: Number(form.paymentTermDays),
+        subtotal: subtotalAmount,
+        ppnRate: form.enablePpn ? Number(form.ppnRate || 0) : 0,
+        ppnAmount: calculatedPpnAmount,
+        totalAmount: grandTotal,
+        remainingAmount: grandTotal,
         notes: form.notes,
-        items: validItems.map((i) => ({
-          productId: i.productId,
-          satuan: i.satuan,
-          quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice),
-          discount: Number(i.discount),
-          notes: i.notes,
-        })),
+        items: mappedItems,
       };
       if (isEdit) {
         await updateOrder(oid(order), payload);
@@ -601,6 +580,45 @@ function POFormModal({ order, onClose, onSaved }) {
                 <option value="90">Net 90 Hari</option>
               </select>
             </div>
+            <div className="flex flex-col gap-3 sm:justify-end">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  name="enablePricing"
+                  checked={form.enablePricing}
+                  onChange={handleChange}
+                  className="rounded border-gray-300"
+                />
+                Gunakan harga dan diskon
+              </label>
+              <div className="flex items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    name="enablePpn"
+                    checked={form.enablePpn}
+                    onChange={handleChange}
+                    disabled={!form.enablePricing}
+                    className="rounded border-gray-300"
+                  />
+                  Gunakan PPN
+                </label>
+                {form.enablePpn && form.enablePricing && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      name="ppnRate"
+                      value={form.ppnRate}
+                      onChange={handleChange}
+                      className="w-20 px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    />
+                    <span className="text-sm text-gray-500">%</span>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label>
               <input
@@ -635,9 +653,9 @@ function POFormModal({ order, onClose, onSaved }) {
                       <th className="text-left px-4 py-2.5 font-medium text-gray-600">Produk</th>
                       <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-24">Satuan</th>
                       <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-28">Qty</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Harga Satuan</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-20">Disc %</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Subtotal</th>
+                      {form.enablePricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Harga Satuan</th>}
+                      {form.enablePricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-20">Disc %</th>}
+                      {form.enablePricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Subtotal</th>}
                       <th className="px-4 py-2.5 w-10"></th>
                     </tr>
                   </thead>
@@ -650,16 +668,20 @@ function POFormModal({ order, onClose, onSaved }) {
                             value={item.productName}
                             onChange={(text) => handleItemChange(idx, 'productName', text)}
                             onSelect={(prod) => {
-                              const items = [...form.items];
-                              items[idx] = {
-                                ...items[idx],
-                                productId: prod._id,
-                                productName: prod.name,
-                                sku: prod.sku || '',
-                                satuan: prod.satuan || items[idx].satuan,
-                                unitPrice: prod.hargaBeli || prod.purchasePrice || items[idx].unitPrice,
-                              };
-                              setForm((p) => ({ ...p, items }));
+                                setForm((p) => {
+                                  const items = [...p.items];
+                                  items[idx] = {
+                                    ...items[idx],
+                                    productId: prod._id,
+                                    productName: prod.name,
+                                    sku: prod.sku || '',
+                                    satuan: prod.satuan || items[idx].satuan,
+                                    unitPrice: p.enablePricing
+                                      ? (prod.hargaBeli || prod.purchasePrice || items[idx].unitPrice)
+                                      : items[idx].unitPrice,
+                                  };
+                                  return { ...p, items };
+                                });
                             }}
                             onClear={() => {
                               handleItemChange(idx, 'productId', '');
@@ -695,28 +717,34 @@ function POFormModal({ order, onClose, onSaved }) {
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                           />
                         </td>
-                        <td className="px-4 py-2.5">
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.unitPrice}
-                            onChange={(e) => handleItemChange(idx, 'unitPrice', Number(e.target.value))}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={item.discount}
-                            onChange={(e) => handleItemChange(idx, 'discount', Number(e.target.value))}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">
-                          {formatCurrency(calculateItemTotal(item))}
-                        </td>
+                        {form.enablePricing && (
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.unitPrice}
+                              onChange={(e) => handleItemChange(idx, 'unitPrice', Number(e.target.value))}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                            />
+                          </td>
+                        )}
+                        {form.enablePricing && (
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={item.discount}
+                              onChange={(e) => handleItemChange(idx, 'discount', Number(e.target.value))}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                            />
+                          </td>
+                        )}
+                        {form.enablePricing && (
+                          <td className="px-4 py-2.5 text-right font-medium text-gray-900">
+                            {formatCurrency(calculateItemTotal(item))}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5">
                           {form.items.length > 1 && (
                             <button
@@ -733,12 +761,21 @@ function POFormModal({ order, onClose, onSaved }) {
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200 bg-gray-50/50">
-                      <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-700">
-                        Grand Total
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">
-                        {formatCurrency(grandTotal)}
-                      </td>
+                      <td colSpan={form.enablePricing ? 6 : 3} className="px-4 py-3 text-right font-semibold text-gray-700">Subtotal</td>
+                      {form.enablePricing && <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">{formatCurrency(subtotalAmount)}</td>}
+                      {!form.enablePricing && <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">-</td>}
+                      <td></td>
+                    </tr>
+                    {form.enablePricing && form.enablePpn && (
+                      <tr className="bg-gray-50/50">
+                        <td colSpan={6} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({Number(form.ppnRate || 0)}%)</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(calculatedPpnAmount)}</td>
+                        <td></td>
+                      </tr>
+                    )}
+                    <tr className="border-t border-gray-200 bg-gray-50/50">
+                      <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">{formatCurrency(grandTotal)}</td>
                       <td></td>
                     </tr>
                   </tfoot>
@@ -793,6 +830,8 @@ function POFormModal({ order, onClose, onSaved }) {
    ═══════════════════════════════════════ */
 function PODetailModal({ order, onClose }) {
   const st = STATUS_MAP[order.status] || STATUS_MAP.draft;
+  const hasPricing = (order.items || []).some((item) => Number(item?.unitPrice || 0) > 0 || Number(item?.discount || 0) > 0) || Number(order?.subtotal || 0) > 0;
+  const ppnAmount = Number(order?.ppnAmount || 0);
 
   const subtotal = (order.items || []).reduce((sum, item) => {
     const s = (item.quantity || 0) * (item.unitPrice || 0);
@@ -859,9 +898,9 @@ function PODetailModal({ order, onClose }) {
                     <th className="text-left px-4 py-2.5 font-medium text-gray-600">Produk</th>
                     <th className="text-left px-4 py-2.5 font-medium text-gray-600">Satuan</th>
                     <th className="text-right px-4 py-2.5 font-medium text-gray-600">Qty</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-gray-600">Harga</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-gray-600">Disc</th>
-                    <th className="text-right px-4 py-2.5 font-medium text-gray-600">Subtotal</th>
+                    {hasPricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600">Harga</th>}
+                    {hasPricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600">Disc</th>}
+                    {hasPricing && <th className="text-right px-4 py-2.5 font-medium text-gray-600">Subtotal</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -879,26 +918,37 @@ function PODetailModal({ order, onClose }) {
                         </td>
                         <td className="px-4 py-2.5 text-gray-600">{item.satuan}</td>
                         <td className="px-4 py-2.5 text-right text-gray-600">{item.quantity}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-600">{item.discount > 0 ? `${item.discount}%` : '-'}</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(total)}</td>
+                        {hasPricing && <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>}
+                        {hasPricing && <td className="px-4 py-2.5 text-right text-gray-600">{item.discount > 0 ? `${item.discount}%` : '-'}</td>}
+                        {hasPricing && <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(total)}</td>}
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-gray-200 bg-gray-50/50">
-                    <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-700">Total</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(order.totalAmount ?? subtotal)}</td>
+                    <td colSpan={hasPricing ? 6 : 3} className="px-4 py-3 text-right font-semibold text-gray-700">Subtotal</td>
+                    {hasPricing && <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(order.subtotal ?? subtotal)}</td>}
+                    {!hasPricing && <td className="px-4 py-3 text-right font-bold text-gray-900">-</td>}
+                  </tr>
+                  {ppnAmount > 0 && (
+                    <tr className="bg-gray-50/50">
+                      <td colSpan={hasPricing ? 6 : 3} className="px-4 py-2 text-right text-sm text-gray-600">PPN ({Number(order?.ppnRate || 0)}%)</td>
+                      <td className="px-4 py-2 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
+                    </tr>
+                  )}
+                  <tr className="border-t border-gray-200 bg-gray-50/50">
+                    <td colSpan={hasPricing ? 6 : 3} className="px-4 py-3 text-right font-semibold text-gray-700">Total</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(order.totalAmount ?? subtotal + ppnAmount)}</td>
                   </tr>
                   {(order.paidAmount > 0 || order.remainingAmount > 0) && (
                     <>
                       <tr className="bg-gray-50/50">
-                        <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-600">Terbayar</td>
+                        <td colSpan={hasPricing ? 6 : 3} className="px-4 py-2 text-right text-sm text-gray-600">Terbayar</td>
                         <td className="px-4 py-2 text-right font-medium text-emerald-600">{formatCurrency(order.paidAmount || 0)}</td>
                       </tr>
                       <tr className="bg-gray-50/50">
-                        <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-600">Sisa Hutang</td>
+                        <td colSpan={hasPricing ? 6 : 3} className="px-4 py-2 text-right text-sm text-gray-600">Sisa Hutang</td>
                         <td className="px-4 py-2 text-right font-bold text-amber-600">{formatCurrency(order.remainingAmount ?? order.totalAmount)}</td>
                       </tr>
                     </>

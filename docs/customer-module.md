@@ -23,34 +23,35 @@
 {
   _id: ObjectId,
   name: String,              // Wajib. 2-200 karakter, unik (case-insensitive)
-  code: String,              // Max 50, unik
+  code: String,              // Auto-generate backend (contoh: C0001), unik
   type: String,              // Enum CUSTOMER_TYPE
+  ownerName: String,         // Nama pemilik
+  ownerAddress: String,      // Alamat pemilik
   contactPerson: String,     // Max 200
   phone: String,             // Format Indonesia (max 30)
-  email: String,             // Format email valid
-  website: String,           // Format URL
 
   address: {
     street: String,          // Max 500
     city: String,            // Max 100
     province: String,        // Max 100
-    postalCode: String,      // Max 10
-    country: String,         // Max 100
   },
 
-  // ── Izin SIA ──
-  siaLicense: {
+  // ── Izin Sarana ──
+  izinSarana: {
     number: String,
-    issuedDate: Date,
     expiryDate: Date,
-    document: String,
   },
 
-  // ── Apoteker Penanggung Jawab ──
-  pharmacist: {
+  // ── Apoteker ──
+  apoteker: {
     name: String,
-    sipaNumber: String,
-    phone: String,
+    address: String,
+  },
+
+  // ── SIPA ──
+  sipa: {
+    number: String,
+    expiryDate: Date,
   },
 
   paymentTermDays: Number,   // 0-365
@@ -61,6 +62,8 @@
     accountName: String,
   },
   npwp: String,              // Max 30
+  npwpName: String,          // Nama NPWP
+  npwpAddress: String,       // Alamat NPWP
   notes: String,             // Max 1000
   isActive: Boolean,         // Default: true
 
@@ -169,18 +172,22 @@ POST /customers
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
 | `name` | `string` | ✅ | 2-200, unik |
-| `code` | `string` | ❌ | Max 50, unik |
+| `code` | `string` | ❌ | Auto-generate backend (C0001) |
 | `type` | `string` | ❌ | Enum `CUSTOMER_TYPE` — validated against `settings.customer.customerTypes` |
+| `ownerName` | `string` | ❌ | Nama pemilik |
+| `ownerAddress` | `string` | ❌ | Alamat pemilik |
 | `contactPerson` | `string` | ❌ | Max 200 |
 | `phone` | `string` | ❌ | Format Indonesia |
-| `email` | `string` | ❌ | Format email |
-| `address` | `object` | ❌ | street, city, province, postalCode, country |
-| `siaLicense` | `object` | ❌ | number, issuedDate, expiryDate, document |
-| `pharmacist` | `object` | ❌ | name, sipaNumber, phone |
+| `address` | `object` | ❌ | street, city, province |
+| `izinSarana` | `object` | ❌ | number, expiryDate |
+| `apoteker` | `object` | ❌ | name, address |
+| `sipa` | `object` | ❌ | number, expiryDate |
 | `paymentTermDays` | `number` | ❌ | 0-365 |
 | `creditLimit` | `number` | ❌ | 0-999999999999. Default dari `settings.customer.defaultCreditLimit` |
 | `bankAccount` | `object` | ❌ | bankName, accountNumber, accountName |
 | `npwp` | `string` | ❌ | Max 30 |
+| `npwpName` | `string` | ❌ | Nama NPWP |
+| `npwpAddress` | `string` | ❌ | Alamat NPWP |
 | `notes` | `string` | ❌ | Max 1000 |
 
 **Error Responses:**
@@ -202,9 +209,9 @@ POST /customers
 
 ## Validasi & Business Rules
 
-1. **Nama unik** (case-insensitive) dan **code unik**
+1. **Nama unik** (case-insensitive), dan **code** dibuat otomatis backend
 2. **Tipe customer** divalidasi terhadap `settings.customer.customerTypes`
-3. **SIA wajib** jika `settings.customer.requireSIA` = true (untuk apotek, RS, klinik)
+3. **Izin Sarana wajib** jika `settings.customer.requireSIA` = true (untuk apotek, RS, klinik)
 4. **Credit limit default** dari `settings.customer.defaultCreditLimit` jika tidak diisi
-5. Customer harus **aktif** dan SIA **tidak expired** untuk digunakan di Sales Order baru
+5. Customer harus **aktif** dan Izin Sarana **tidak expired** untuk digunakan di Sales Order baru
 6. **Hard delete** — data dihapus permanen

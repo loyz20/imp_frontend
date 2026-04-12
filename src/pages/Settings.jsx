@@ -55,25 +55,6 @@ const APP_TAB_GROUPS = [
     ],
   },
   {
-    label: 'Dokumen',
-    items: [
-      { id: 'invoice', label: 'Invoice', icon: ReceiptIcon },
-      { id: 'purchaseOrder', label: 'Purchase Order', icon: CartIcon },
-      { id: 'deliveryOrder', label: 'Delivery Order', icon: TruckIcon },
-      { id: 'returnOrder', label: 'Retur', icon: ArrowReturnIcon },
-    ],
-  },
-  {
-    label: 'Operasional',
-    items: [
-      { id: 'inventory', label: 'Inventaris', icon: BoxIcon },
-      { id: 'cdob', label: 'CDOB', icon: ClipboardIcon },
-      { id: 'medication', label: 'Obat', icon: PillIcon },
-      { id: 'customer', label: 'Pelanggan', icon: UsersIcon },
-      { id: 'payment', label: 'Pembayaran', icon: CreditCardIcon },
-    ],
-  },
-  {
     label: 'Sistem',
     items: [
       { id: 'appNotification', label: 'Notifikasi Sistem', icon: BellIcon },
@@ -265,15 +246,6 @@ export default function Settings() {
           {isAdmin && activeTab === 'licenses' && <LicensesTab />}
           {isAdmin && activeTab === 'pharmacist' && <PharmacistTab />}
           {isAdmin && activeTab === 'tax' && <TaxTab />}
-          {isAdmin && activeTab === 'invoice' && <InvoiceTab />}
-          {isAdmin && activeTab === 'purchaseOrder' && <PurchaseOrderTab />}
-          {isAdmin && activeTab === 'deliveryOrder' && <DeliveryOrderTab />}
-          {isAdmin && activeTab === 'returnOrder' && <ReturnOrderTab />}
-          {isAdmin && activeTab === 'inventory' && <InventoryTab />}
-          {isAdmin && activeTab === 'cdob' && <CdobTab />}
-          {isAdmin && activeTab === 'medication' && <MedicationTab />}
-          {isAdmin && activeTab === 'customer' && <CustomerTab />}
-          {isAdmin && activeTab === 'payment' && <PaymentTab />}
           {isAdmin && activeTab === 'appNotification' && <AppNotificationTab />}
           {isAdmin && activeTab === 'reporting' && <ReportingTab />}
           {isAdmin && activeTab === 'general' && <GeneralTab />}
@@ -494,8 +466,10 @@ function useAppSection(section) {
 /* ── Company ── */
 function CompanyTab() {
   const data = useAppSection('company');
+  const fetchSection = useSettingsStore((s) => s.fetchSection);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({});
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     if (data && Object.keys(data).length > 0) {
@@ -504,6 +478,7 @@ function CompanyTab() {
         phone: data.phone || '',
         email: data.email || '',
         website: data.website || '',
+        logo: data.logo || null,
         officeAddress: data.officeAddress || { street: '', city: '', province: '', postalCode: '', country: 'Indonesia' },
         warehouseAddress: data.warehouseAddress || { street: '', city: '', province: '', postalCode: '', country: 'Indonesia' },
       });
@@ -513,11 +488,33 @@ function CompanyTab() {
   const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   const handleAddress = (field, key, val) => setForm((p) => ({ ...p, [field]: { ...p[field], [key]: val } }));
 
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar (PNG, JPG, SVG)');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran logo maksimal 2 MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setForm((p) => ({ ...p, logo: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setForm((p) => ({ ...p, logo: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       await settingsService.updateCompany(form);
+      await fetchSection('company');
       toast.success('Info perusahaan berhasil disimpan');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menyimpan');
@@ -530,6 +527,47 @@ function CompanyTab() {
     <div className="space-y-6">
       <SectionCard title="Info Perusahaan" desc="Data identitas perusahaan PBF." onSubmit={handleSubmit} loading={loading}>
         <div className="max-w-2xl space-y-5">
+
+          {/* Logo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Logo Perusahaan</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+                {form.logo ? (
+                  <img src={form.logo} alt="Logo" className="w-full h-full object-contain" />
+                ) : (
+                  <BuildingIcon className="w-8 h-8 text-gray-300" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 text-sm font-medium rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  {form.logo ? 'Ganti Logo' : 'Upload Logo'}
+                </button>
+                {form.logo && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="ml-2 px-4 py-2 text-sm font-medium rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Hapus
+                  </button>
+                )}
+                <p className="text-xs text-gray-400">PNG, JPG, SVG, WebP. Maks 2 MB.</p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
               <InputField label="Nama Perusahaan" name="name" value={form.name || ''} onChange={handleChange} />
@@ -636,51 +674,97 @@ function LicensesTab() {
 /* ── Pharmacist ── */
 function PharmacistTab() {
   const data = useAppSection('company');
-  const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', sipaNumber: '', straNumber: '', sipaExpiry: '', straExpiry: '', phone: '', email: '' });
+  const emptyPharmacist = { name: '', sipaNumber: '', straNumber: '', sipaExpiry: '', straExpiry: '', phone: '', email: '' };
+  const [loadingObat, setLoadingObat] = useState(false);
+  const [loadingAlkes, setLoadingAlkes] = useState(false);
+  const [obatForm, setObatForm] = useState(emptyPharmacist);
+  const [alkesForm, setAlkesForm] = useState(emptyPharmacist);
+
+  const normalizePharmacist = (p = {}) => ({
+    name: p?.name || '',
+    sipaNumber: p?.sipaNumber || '',
+    straNumber: p?.straNumber || '',
+    sipaExpiry: p?.sipaExpiry?.slice(0, 10) || '',
+    straExpiry: p?.straExpiry?.slice(0, 10) || '',
+    phone: p?.phone || '',
+    email: p?.email || '',
+  });
 
   useEffect(() => {
-    const p = data?.responsiblePharmacist;
-    if (p) setForm({
-      name: p.name || '',
-      sipaNumber: p.sipaNumber || '',
-      straNumber: p.straNumber || '',
-      sipaExpiry: p.sipaExpiry?.slice(0, 10) || '',
-      straExpiry: p.straExpiry?.slice(0, 10) || '',
-      phone: p.phone || '',
-      email: p.email || '',
-    });
+    const legacy = data?.responsiblePharmacist || {};
+    const pjObat = data?.responsiblePharmacistObat || data?.pharmacistObat || legacy;
+    const pjAlkes = data?.responsiblePharmacistAlkes || data?.pharmacistAlkes || legacy;
+    setObatForm(normalizePharmacist(pjObat));
+    setAlkesForm(normalizePharmacist(pjAlkes));
   }, [data]);
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleObatChange = (e) => setObatForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleAlkesChange = (e) => setAlkesForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  const handleSubmitObat = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setLoadingObat(true);
     try {
-      await settingsService.updatePharmacist(form);
-      toast.success('Data apoteker PJ berhasil disimpan');
+      if (settingsService.updatePharmacistObat) {
+        await settingsService.updatePharmacistObat(obatForm);
+      } else {
+        await settingsService.updatePharmacist(obatForm);
+      }
+      toast.success('Data apoteker PJ Obat berhasil disimpan');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menyimpan');
     } finally {
-      setLoading(false);
+      setLoadingObat(false);
+    }
+  };
+
+  const handleSubmitAlkes = async (e) => {
+    e.preventDefault();
+    setLoadingAlkes(true);
+    try {
+      if (settingsService.updatePharmacistAlkes) {
+        await settingsService.updatePharmacistAlkes(alkesForm);
+      } else {
+        await settingsService.updatePharmacist(alkesForm);
+      }
+      toast.success('Data apoteker PJ Alkes berhasil disimpan');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menyimpan');
+    } finally {
+      setLoadingAlkes(false);
     }
   };
 
   return (
-    <SectionCard title="Apoteker Penanggung Jawab" desc="Data apoteker penanggung jawab perusahaan." onSubmit={handleSubmit} loading={loading}>
-      <div className="max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <div className="sm:col-span-2">
-          <InputField label="Nama Lengkap" name="name" value={form.name} onChange={handleChange} />
+    <div className="space-y-6">
+      <SectionCard title="Apoteker PJ Obat" desc="Data apoteker penanggung jawab untuk produk obat." onSubmit={handleSubmitObat} loading={loadingObat}>
+        <div className="max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="sm:col-span-2">
+            <InputField label="Nama Lengkap" name="name" value={obatForm.name} onChange={handleObatChange} />
+          </div>
+          <InputField label="Nomor SIPA" name="sipaNumber" value={obatForm.sipaNumber} onChange={handleObatChange} />
+          <InputField label="Expired SIPA" name="sipaExpiry" type="date" value={obatForm.sipaExpiry} onChange={handleObatChange} />
+          <InputField label="Nomor STRA" name="straNumber" value={obatForm.straNumber} onChange={handleObatChange} />
+          <InputField label="Expired STRA" name="straExpiry" type="date" value={obatForm.straExpiry} onChange={handleObatChange} />
+          <InputField label="Telepon" name="phone" value={obatForm.phone} onChange={handleObatChange} />
+          <InputField label="Email" name="email" type="email" value={obatForm.email} onChange={handleObatChange} />
         </div>
-        <InputField label="Nomor SIPA" name="sipaNumber" value={form.sipaNumber} onChange={handleChange} />
-        <InputField label="Expired SIPA" name="sipaExpiry" type="date" value={form.sipaExpiry} onChange={handleChange} />
-        <InputField label="Nomor STRA" name="straNumber" value={form.straNumber} onChange={handleChange} />
-        <InputField label="Expired STRA" name="straExpiry" type="date" value={form.straExpiry} onChange={handleChange} />
-        <InputField label="Telepon" name="phone" value={form.phone} onChange={handleChange} />
-        <InputField label="Email" name="email" type="email" value={form.email} onChange={handleChange} />
-      </div>
-    </SectionCard>
+      </SectionCard>
+
+      <SectionCard title="Apoteker PJ Alkes" desc="Data apoteker penanggung jawab untuk alat kesehatan." onSubmit={handleSubmitAlkes} loading={loadingAlkes}>
+        <div className="max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="sm:col-span-2">
+            <InputField label="Nama Lengkap" name="name" value={alkesForm.name} onChange={handleAlkesChange} />
+          </div>
+          <InputField label="Nomor SIPA" name="sipaNumber" value={alkesForm.sipaNumber} onChange={handleAlkesChange} />
+          <InputField label="Expired SIPA" name="sipaExpiry" type="date" value={alkesForm.sipaExpiry} onChange={handleAlkesChange} />
+          <InputField label="Nomor STRA" name="straNumber" value={alkesForm.straNumber} onChange={handleAlkesChange} />
+          <InputField label="Expired STRA" name="straExpiry" type="date" value={alkesForm.straExpiry} onChange={handleAlkesChange} />
+          <InputField label="Telepon" name="phone" value={alkesForm.phone} onChange={handleAlkesChange} />
+          <InputField label="Email" name="email" type="email" value={alkesForm.email} onChange={handleAlkesChange} />
+        </div>
+      </SectionCard>
+    </div>
   );
 }
 

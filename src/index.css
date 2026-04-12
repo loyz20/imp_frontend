@@ -320,4 +320,187 @@
   .invoice-footer p {
     margin: 1px 0;
   }
+
+  /* ── Purchase Order Letter (classic format) ── */
+  .po-letter-page {
+    font-family: 'Times New Roman', serif;
+    font-size: 11pt;
+    color: #111;
+    line-height: 1.35;
+  }
+  .po-letter-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #111;
+    padding-bottom: 8px;
+  }
+  .po-letter-head-info {
+    flex: 1;
+  }
+  .po-letter-head-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5pt;
+    margin: 1px 0;
+  }
+  .po-letter-logo-img {
+    max-height: 72px;
+    max-width: 80px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .po-letter-company {
+    margin: 0;
+    font-size: 17pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .po-letter-head-line {
+    margin: 1px 0;
+    font-size: 10pt;
+  }
+
+  .po-letter-title-wrap {
+    text-align: center;
+    margin: 10px 0 14px;
+  }
+  .po-letter-title {
+    margin: 0;
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .po-letter-number {
+    margin: 2px 0 0;
+    font-size: 12pt;
+  }
+
+  .po-letter-recipient {
+    margin-bottom: 10px;
+  }
+  .po-letter-line {
+    margin: 1px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .po-letter-label {
+    min-width: 78px;
+  }
+  .po-letter-value {
+    flex: 1;
+  }
+  .po-letter-open {
+    margin: 10px 0 8px;
+  }
+
+  .po-letter-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #333;
+    table-layout: fixed;
+  }
+  .po-letter-table th,
+  .po-letter-table td {
+    border: 1px solid #333;
+    padding: 4px 6px;
+    font-size: 10.5pt;
+    vertical-align: top;
+  }
+  .po-letter-table thead th {
+    text-align: center;
+    font-weight: 700;
+  }
+  .po-letter-table tbody td {
+    height: 22px;
+  }
+  .po-col-no {
+    width: 7%;
+  }
+  .po-col-name {
+    width: 63%;
+  }
+  .po-col-qty {
+    width: 15%;
+  }
+  .po-col-unit {
+    width: 15%;
+  }
+  .po-col-price {
+    width: 14%;
+  }
+  .po-col-disc {
+    width: 12%;
+  }
+  .po-col-subtotal {
+    width: 14%;
+  }
+  .po-letter-table-pricing .po-col-name {
+    width: 34%;
+  }
+  .po-letter-table-pricing .po-col-no {
+    width: 6%;
+  }
+  .po-letter-table-pricing .po-col-qty,
+  .po-letter-table-pricing .po-col-unit {
+    width: 12%;
+  }
+  .po-letter-table-pricing .po-col-price {
+    width: 13%;
+  }
+  .po-letter-table-pricing .po-col-disc {
+    width: 9%;
+  }
+  .po-letter-table-pricing .po-col-subtotal {
+    width: 14%;
+  }
+  .po-cell-center {
+    text-align: center;
+  }
+  .po-cell-right {
+    text-align: right;
+  }
+  .po-cell-foot-label {
+    text-align: right;
+    padding-right: 8px;
+    border-right: 1px solid #333;
+  }
+  .po-row-grand-total td {
+    font-weight: 700;
+    border-top: 1px solid #333;
+  }
+
+  .po-letter-notes {
+    border: 1px solid #333;
+    border-top: none;
+    min-height: 44px;
+    padding: 6px;
+  }
+  .po-letter-notes-title {
+    margin: 0;
+    font-weight: 700;
+  }
+  .po-letter-notes p {
+    margin: 0;
+  }
+
+  .po-letter-signature {
+    margin-top: 24px;
+    margin-left: auto;
+    width: 45%;
+    text-align: left;
+  }
+  .po-letter-signature p {
+    margin: 0;
+  }
+  .po-letter-sign-space {
+    height: 70px;
+  }
+  .po-letter-signer-name {
+    font-weight: 700;
+    text-decoration: underline;
+  }
 }

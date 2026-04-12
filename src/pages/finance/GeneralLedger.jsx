@@ -107,6 +107,7 @@ function ChartOfAccountsTab() {
   const [expandedIds, setExpandedIds] = useState(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
+  const accountNodes = useMemo(() => normalizeAccountNodes(accounts), [accounts]);
 
   useEffect(() => {
     (async () => {
@@ -116,19 +117,20 @@ function ChartOfAccountsTab() {
   }, [fetchAccounts]);
 
   useEffect(() => {
-    if (!accounts?.length) return;
+    if (!accountNodes.length) return;
     const ids = new Set();
     const walk = (nodes) => {
-      (nodes || []).forEach((n) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach((n) => {
         if (n.children?.length) {
           ids.add(n._id);
           walk(n.children);
         }
       });
     };
-    walk(accounts);
+    walk(accountNodes);
     setExpandedIds(ids);
-  }, [accounts]);
+  }, [accountNodes]);
 
   const toggleNode = (id) => setExpandedIds((prev) => {
     const next = new Set(prev);
@@ -136,21 +138,22 @@ function ChartOfAccountsTab() {
     return next;
   });
 
-  const allAccountsFlat = useMemo(() => flattenAccounts(accounts || []), [accounts]);
+  const allAccountsFlat = useMemo(() => flattenAccounts(accountNodes), [accountNodes]);
 
   const flatRows = useMemo(() => {
     const rows = [];
     const walk = (nodes, depth) => {
-      (nodes || []).forEach((node) => {
+      if (!Array.isArray(nodes)) return;
+      nodes.forEach((node) => {
         rows.push({ ...node, depth });
         if (expandedIds.has(node._id) && node.children?.length) {
           walk(node.children, depth + 1);
         }
       });
     };
-    walk(accounts || [], 0);
+    walk(accountNodes, 0);
     return rows;
-  }, [accounts, expandedIds]);
+  }, [accountNodes, expandedIds]);
 
   const handleSaveAccount = async (id, payload) => {
     setSaving(true);
@@ -317,6 +320,25 @@ function JournalEntriesTab() {
 
   const [expandedId, setExpandedId] = useState(null);
 
+  const normalizedJournals = useMemo(() => {
+    return (journalEntries || []).map((journal) => {
+      const normalizedEntries = (journal.entries || []).map((entry) => ({
+        ...entry,
+        account: entry.account || entry.accountId || null,
+      }));
+
+      const fallbackDebit = normalizedEntries.reduce((sum, entry) => sum + Number(entry.debit || 0), 0);
+      const fallbackCredit = normalizedEntries.reduce((sum, entry) => sum + Number(entry.credit || 0), 0);
+
+      return {
+        ...journal,
+        entries: normalizedEntries,
+        totalDebit: Number(journal.totalDebit ?? fallbackDebit),
+        totalCredit: Number(journal.totalCredit ?? fallbackCredit),
+      };
+    });
+  }, [journalEntries]);
+
   useEffect(() => {
     fetchJournalEntries();
   }, [filters, fetchJournalEntries]);
@@ -383,13 +405,13 @@ function JournalEntriesTab() {
                   <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
                   <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                 </td></tr>
-              ) : (journalEntries || []).length === 0 ? (
+              ) : normalizedJournals.length === 0 ? (
                 <tr><td colSpan={7} className="px-5 py-12 text-center">
                   <FileText className="w-10 h-10 text-gray-300 mx-auto" />
                   <p className="text-sm text-gray-400 mt-2">Tidak ada journal entry ditemukan.</p>
                 </td></tr>
               ) : (
-                journalEntries.map((j) => {
+                normalizedJournals.map((j) => {
                   const isExpanded = expandedId === j._id;
                   return (
                     <React.Fragment key={j._id}>
@@ -624,6 +646,7 @@ function debounce(fn, ms) {
 function flattenAccounts(nodes = []) {
   const out = [];
   const walk = (items) => {
+    if (!Array.isArray(items)) return;
     items.forEach((item) => {
       out.push(item);
       if (Array.isArray(item.children) && item.children.length) walk(item.children);
@@ -631,6 +654,65 @@ function flattenAccounts(nodes = []) {
   };
   walk(nodes);
   return out;
+}
+
+function normalizeAccountNodes(accounts) {
+  const raw = Array.isArray(accounts)
+    ? accounts
+    : Array.isArray(accounts?.docs)
+      ? accounts.docs
+      : [];
+
+  if (raw.length === 0) return [];
+
+  const hasNestedChildren = raw.some((a) => Array.isArray(a?.children) && a.children.length > 0);
+  if (hasNestedChildren) {
+    const nested = raw.map((a) => ({ ...a, children: Array.isArray(a.children) ? a.children : [] }));
+    sortAccountTree(nested);
+    return nested;
+  }
+
+  // Backend now returns flat docs with parentId/level. Build tree structure for table rendering.
+  const map = new Map();
+  raw.forEach((a) => {
+    const key = getAccountId(a);
+    if (!key) return;
+    map.set(key, { ...a, children: [] });
+  });
+
+  const roots = [];
+  map.forEach((node) => {
+    const parentKey = getParentId(node);
+    if (parentKey && map.has(parentKey) && parentKey !== getAccountId(node)) {
+      map.get(parentKey).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  sortAccountTree(roots);
+  return roots;
+}
+
+function getAccountId(account) {
+  return account?._id || account?.id || '';
+}
+
+function getParentId(account) {
+  const p = account?.parentId;
+  if (!p) return '';
+  if (typeof p === 'string') return p;
+  if (typeof p === 'object') return p._id || p.id || '';
+  return '';
+}
+
+function sortAccountTree(nodes) {
+  nodes.sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || ''), undefined, { numeric: true }));
+  nodes.forEach((node) => {
+    if (Array.isArray(node.children) && node.children.length) {
+      sortAccountTree(node.children);
+    }
+  });
 }
 
 function buildDescendantIdSet(node, set = new Set()) {

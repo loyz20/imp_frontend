@@ -51,8 +51,28 @@ export default function StockCard() {
   };
 
   const product = stockCard?.product;
-  const summary = stockCard?.summary;
-  const entries = stockCard?.entries || [];
+  const entries = (stockCard?.entries || stockCard?.mutations || []).map((entry) => {
+    if (entry?.quantityIn != null || entry?.quantityOut != null) return entry;
+
+    const qty = Number(entry?.quantity || 0);
+    return {
+      ...entry,
+      _id: entry?._id || entry?.id,
+      mutationNumber: entry?.mutationNumber || entry?.referenceNumber || '',
+      description: entry?.description || entry?.notes || '',
+      quantityIn: qty > 0 ? qty : 0,
+      quantityOut: qty < 0 ? Math.abs(qty) : 0,
+      balance: Number(entry?.balance ?? entry?.balanceAfter ?? 0),
+    };
+  });
+
+  const summary = stockCard?.summary || {
+    openingBalance: entries.length ? Number(entries[0]?.balanceBefore ?? 0) : 0,
+    totalIn: entries.reduce((sum, e) => sum + Number(e?.quantityIn || 0), 0),
+    totalOut: entries.reduce((sum, e) => sum + Number(e?.quantityOut || 0), 0),
+    netChange: entries.reduce((sum, e) => sum + Number(e?.quantityIn || 0) - Number(e?.quantityOut || 0), 0),
+    closingBalance: entries.length ? Number(entries[entries.length - 1]?.balance ?? entries[entries.length - 1]?.balanceAfter ?? 0) : 0,
+  };
 
   return (
     <div className="space-y-6">

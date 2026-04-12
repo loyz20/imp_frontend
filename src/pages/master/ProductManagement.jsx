@@ -6,34 +6,42 @@ import toast from 'react-hot-toast';
 import {
   Download, Upload, Plus, Eye, SquarePen, Trash2, X, Check, AlertCircle,
   Hash, QrCode, ChevronDown, ChevronLeft, ChevronRight, ShieldCheck,
-  FileText, FlaskConical, CircleDollarSign, SlidersHorizontal, Pencil,
+  FileText, FlaskConical, SlidersHorizontal, Pencil,
   Package, ArrowRight, AlertTriangle, Ban, CheckCircle, CircleAlert,
-  Loader2, TrendingUp, PlusCircle, RefreshCw, Info,
+  Loader2, PlusCircle, RefreshCw, Info,
 } from 'lucide-react';
 
 /* ── Constants ── */
 const KATEGORI_OPTIONS = [
   { value: 'obat', label: 'Obat' },
-  { value: 'alkes', label: 'Alat Kesehatan' },
-  { value: 'bhp', label: 'Bahan Habis Pakai' },
-  { value: 'suplemen', label: 'Suplemen & Vitamin' },
-  { value: 'kosmetik', label: 'Kosmetik / Kecantikan' },
-  { value: 'obat_tradisional', label: 'Obat Tradisional / Herbal' },
-  { value: 'lainnya', label: 'Lainnya' },
+  { value: 'alat_kesehatan', label: 'Alat Kesehatan' },
 ];
 
-const GOLONGAN_OBAT = [
-  { value: 'narkotika', label: 'Narkotika', color: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 'psikotropika', label: 'Psikotropika', color: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 'obat_keras', label: 'Obat Keras (K)', color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { value: 'obat_keras_terbatas', label: 'Obat Keras Terbatas (W)', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  { value: 'obat_bebas_terbatas', label: 'Obat Bebas Terbatas (P)', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 'obat_bebas', label: 'Obat Bebas', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  { value: 'fitofarmaka', label: 'Fitofarmaka', color: 'bg-green-100 text-green-800 border-green-200' },
-  { value: 'oht', label: 'Obat Herbal Terstandar (OHT)', color: 'bg-teal-100 text-teal-800 border-teal-200' },
-  { value: 'jamu', label: 'Jamu', color: 'bg-lime-100 text-lime-800 border-lime-200' },
-  { value: 'non_obat', label: 'Non-Obat', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-];
+const GOLONGAN_BY_CATEGORY = {
+  obat: [
+    { value: 'prekursor', label: 'Prekursor', color: 'bg-red-100 text-red-800 border-red-200' },
+    { value: 'obat_tertentu', label: 'Obat Tertentu', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+    { value: 'obat_keras', label: 'Obat Keras', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+    { value: 'obat_bebas_terbatas', label: 'Obat Bebas Terbatas', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+    { value: 'obat_bebas', label: 'Obat Bebas', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    { value: 'suplemen', label: 'Suplemen', color: 'bg-teal-100 text-teal-800 border-teal-200' },
+    { value: 'obat_tradisional', label: 'Obat Tradisional', color: 'bg-lime-100 text-lime-800 border-lime-200' },
+    { value: 'lainnya', label: 'Lainnya', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  ],
+  alat_kesehatan: [
+    { value: 'elektromedik_non_radiasi', label: 'Elektromedik Non Radiasi', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    { value: 'non_elektromedik_non_steril', label: 'Non Elektromedik Non Steril', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+    { value: 'non_elektromedik_steril', label: 'Non Elektromedik Steril', color: 'bg-sky-100 text-sky-800 border-sky-200' },
+    { value: 'diagnostik_invitro', label: 'Diagnostik Invitro', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+    { value: 'bmhp', label: 'BMHP', color: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200' },
+    { value: 'pkrt', label: 'PKRT', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+    { value: 'lainnya', label: 'Lainnya', color: 'bg-gray-100 text-gray-800 border-gray-200' },
+  ],
+};
+
+const GOLONGAN_OPTIONS = Object.values(GOLONGAN_BY_CATEGORY)
+  .flat()
+  .filter((item, index, arr) => arr.findIndex((it) => it.value === item.value) === index);
 
 const BENTUK_SEDIAAN = [
   'Tablet', 'Kaplet', 'Kapsul', 'Sirup', 'Suspensi', 'Emulsi', 'Drops', 'Injeksi',
@@ -47,20 +55,12 @@ const SATUAN_OPTIONS = [
   'Pcs', 'Pack', 'Rol', 'Lembar', 'Set', 'Kg', 'Gram', 'Liter', 'mL',
 ];
 
-const SUHU_PENYIMPANAN = [
-  { value: 'ruangan', label: 'Suhu Ruangan (15–30°C)' },
-  { value: 'sejuk', label: 'Suhu Sejuk (8–15°C)' },
-  { value: 'dingin', label: 'Suhu Dingin (2–8°C)' },
-  { value: 'beku', label: 'Suhu Beku (< 0°C)' },
-];
-
 const KATEGORI_LABELS = Object.fromEntries(KATEGORI_OPTIONS.map((k) => [k.value, k.label]));
-const GOLONGAN_MAP = Object.fromEntries(GOLONGAN_OBAT.map((g) => [g.value, g]));
+const GOLONGAN_MAP = Object.fromEntries(GOLONGAN_OPTIONS.map((g) => [g.value, g]));
 
 /* ── Role helpers ── */
 const CAN_CRUD_ROLES = ['superadmin', 'admin', 'apoteker'];
 const CAN_DELETE_ROLES = ['superadmin', 'admin'];
-const CAN_VIEW_PRICE_ROLES = ['superadmin', 'admin', 'keuangan', 'apoteker'];
 const CAN_IMPORT_ROLES = ['superadmin', 'admin'];
 
 /* ── Main Page ── */
@@ -75,8 +75,8 @@ export default function ProductManagement() {
 
   const canCrud = CAN_CRUD_ROLES.includes(userRole);
   const canDelete = CAN_DELETE_ROLES.includes(userRole);
-  const canViewPrice = CAN_VIEW_PRICE_ROLES.includes(userRole);
   const canImport = CAN_IMPORT_ROLES.includes(userRole);
+  const safeProducts = Array.isArray(products) ? products : [];
 
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -209,7 +209,7 @@ export default function ProductManagement() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Cari nama produk, kode SKU, atau No. Registrasi..."
+              placeholder="Cari nama produk, kode produk, atau No. Registrasi..."
               defaultValue={filters.search}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
@@ -231,7 +231,7 @@ export default function ProductManagement() {
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
           >
             <option value="">Semua Golongan</option>
-            {GOLONGAN_OBAT.map((g) => (
+            {GOLONGAN_OPTIONS.map((g) => (
               <option key={g.value} value={g.value}>{g.label}</option>
             ))}
           </select>
@@ -253,11 +253,7 @@ export default function ProductManagement() {
             <option value="createdAt">Terlama</option>
             <option value="name">Nama A-Z</option>
             <option value="-name">Nama Z-A</option>
-            <option value="sku">SKU A-Z</option>
-            <option value="-hna">HNA Tertinggi</option>
-            <option value="hna">HNA Terendah</option>
-            <option value="-hargaJual">Harga Jual Tertinggi</option>
-            <option value="hargaJual">Harga Jual Terendah</option>
+            <option value="sku">Kode Produk A-Z</option>
           </select>
         </div>
       </div>
@@ -272,18 +268,17 @@ export default function ProductManagement() {
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Kategori</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600">Golongan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Sediaan</th>
-                {canViewPrice && <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">HNA</th>}
                 <th className="text-center px-5 py-3.5 font-semibold text-gray-600">Status</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={canViewPrice ? 7 : 6} className="px-5 py-12 text-center text-gray-400">Memuat data...</td></tr>
-              ) : products.length === 0 ? (
-                <tr><td colSpan={canViewPrice ? 7 : 6} className="px-5 py-12 text-center text-gray-400">Tidak ada produk ditemukan.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400">Memuat data...</td></tr>
+              ) : safeProducts.length === 0 ? (
+                <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400">Tidak ada produk ditemukan.</td></tr>
               ) : (
-                products.map((product) => {
+                safeProducts.map((product) => {
                   const gol = GOLONGAN_MAP[product.golongan];
                   return (
                     <tr key={pid(product)} className="hover:bg-gray-50/50 transition-colors">
@@ -292,7 +287,7 @@ export default function ProductManagement() {
                         <div className="min-w-0">
                           <p className="font-medium text-gray-900 truncate">{product.name}</p>
                           <p className="text-xs text-gray-400 truncate">
-                            {product.sku && <span className="mr-2">SKU: {product.sku}</span>}
+                            {product.sku && <span className="mr-2">Kode: {product.sku}</span>}
                             {product.nie && <span>NIE: {product.nie}</span>}
                           </p>
                           {product.manufacturer && (
@@ -318,15 +313,8 @@ export default function ProductManagement() {
                       <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">
                         <div>
                           <p>{product.bentukSediaan || '-'}</p>
-                          {product.kekuatan && <p className="text-xs text-gray-400">{product.kekuatan}</p>}
                         </div>
                       </td>
-                      {/* HNA */}
-                      {canViewPrice && (
-                        <td className="px-5 py-3.5 text-right text-gray-700 font-medium hidden md:table-cell">
-                          {product.hna ? formatCurrency(product.hna) : '-'}
-                        </td>
-                      )}
                       {/* Status */}
                       <td className="px-5 py-3.5 text-center">
                         <button onClick={() => canCrud && handleToggleStatus(product)} disabled={!canCrud}>
@@ -395,7 +383,7 @@ export default function ProductManagement() {
           onSaved={() => { closeForm(); fetchProducts(); fetchStats(); }}
         />
       )}
-      {showDetail && <ProductDetailModal product={showDetail} onClose={() => setShowDetail(null)} canViewPrice={canViewPrice} />}
+      {showDetail && <ProductDetailModal product={showDetail} onClose={() => setShowDetail(null)} />}
       {deleteConfirm && <DeleteConfirmModal product={deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={handleDelete} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); fetchProducts(); fetchStats(); }} />}
     </div>
@@ -421,24 +409,15 @@ function ProductFormModal({ product, onClose, onSaved }) {
     noBpom: product?.noBpom || '',
     // Farmasi
     bentukSediaan: product?.bentukSediaan || '',
-    kekuatan: product?.kekuatan || '',
     zatAktif: product?.zatAktif || '',
-    golonganTerapi: product?.golonganTerapi || '',
     satuan: product?.satuan || 'Box',
     satuanKecil: product?.satuanKecil || '',
     isiPerSatuan: product?.isiPerSatuan || '',
-    // Harga
-    hna: product?.hna || '',
-    het: product?.het || '',
-    hargaBeli: product?.hargaBeli || '',
-    hargaJual: product?.hargaJual || '',
     ppn: product?.ppn ?? true,
     // Stok & Gudang
     stokMinimum: product?.stokMinimum || '',
-    suhuPenyimpanan: product?.suhuPenyimpanan || 'ruangan',
     // Produsen
     manufacturer: product?.manufacturer || '',
-    countryOfOrigin: product?.countryOfOrigin || 'Indonesia',
     // Lainnya
     keterangan: product?.keterangan || '',
     isActive: product?.isActive ?? true,
@@ -446,7 +425,22 @@ function ProductFormModal({ product, onClose, onSaved }) {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
+    setForm((p) => {
+      const nextValue = type === 'checkbox' ? checked : value;
+      if (name === 'category') {
+        const nextGolonganOptions = GOLONGAN_BY_CATEGORY[nextValue] || [];
+        const hasCurrentGolongan = nextGolonganOptions.some((g) => g.value === p.golongan);
+        return {
+          ...p,
+          category: nextValue,
+          golongan: hasCurrentGolongan ? p.golongan : '',
+        };
+      }
+      if (name === 'sku') {
+        return { ...p, sku: String(nextValue).toUpperCase() };
+      }
+      return { ...p, [name]: nextValue };
+    });
     if (validationErrors[name]) {
       setValidationErrors((prev) => { const n = { ...prev }; delete n[name]; return n; });
     }
@@ -456,8 +450,9 @@ function ProductFormModal({ product, onClose, onSaved }) {
     const errs = {};
     if (!form.name || form.name.trim().length < 2) errs.name = 'Nama produk minimal 2 karakter';
     if (form.name && form.name.trim().length > 200) errs.name = 'Nama produk maksimal 200 karakter';
+    const validGolongan = (GOLONGAN_BY_CATEGORY[form.category] || []).some((g) => g.value === form.golongan);
+    if (!validGolongan) errs.golongan = 'Golongan wajib sesuai kategori produk';
     if (form.category === 'obat' && !form.nie) errs.nie = 'NIE wajib diisi untuk kategori Obat';
-    if (form.hargaJual && form.hargaBeli && Number(form.hargaJual) < Number(form.hargaBeli)) errs.hargaJual = 'Harga jual sebaiknya ÃƒÂ¢°Ã‚Â¥ harga beli';
     return errs;
   };
 
@@ -466,7 +461,27 @@ function ProductFormModal({ product, onClose, onSaved }) {
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setValidationErrors(errs);
-      toast.error('Periksa kembali form, terdapat kesalahan');
+
+      const tabByField = {
+        name: 0,
+        sku: 0,
+        category: 0,
+        golongan: 0,
+        nie: 1,
+        noBpom: 1,
+        bentukSediaan: 1,
+        zatAktif: 1,
+        satuan: 2,
+        satuanKecil: 2,
+        isiPerSatuan: 2,
+        stokMinimum: 2,
+        ppn: 2,
+        keterangan: 3,
+        isActive: 3,
+      };
+      const firstErrorKey = Object.keys(errs)[0];
+      setActiveTab(tabByField[firstErrorKey] ?? 0);
+      toast.error(errs[firstErrorKey] || 'Periksa kembali form, terdapat kesalahan');
       return;
     }
     setLoading(true);
@@ -475,10 +490,6 @@ function ProductFormModal({ product, onClose, onSaved }) {
       for (const [key, val] of Object.entries(form)) {
         if (val !== '' && val !== null && val !== undefined) payload[key] = val;
       }
-      if (payload.hna) payload.hna = Number(payload.hna);
-      if (payload.het) payload.het = Number(payload.het);
-      if (payload.hargaBeli) payload.hargaBeli = Number(payload.hargaBeli);
-      if (payload.hargaJual) payload.hargaJual = Number(payload.hargaJual);
       if (payload.stokMinimum) payload.stokMinimum = Number(payload.stokMinimum);
       if (payload.isiPerSatuan) payload.isiPerSatuan = Number(payload.isiPerSatuan);
 
@@ -506,13 +517,9 @@ function ProductFormModal({ product, onClose, onSaved }) {
   const steps = [
     { label: 'Umum', icon: <Package size={16} /> },
     { label: 'Farmasi', icon: <FlaskConical size={16} /> },
-    { label: 'Harga', icon: <CircleDollarSign size={16} /> },
+    { label: 'Satuan', icon: <SlidersHorizontal size={16} /> },
     { label: 'Lainnya', icon: <SlidersHorizontal size={16} /> },
   ];
-
-  const marginPct = form.hargaBeli && form.hargaJual
-    ? (((Number(form.hargaJual) - Number(form.hargaBeli)) / Number(form.hargaBeli)) * 100).toFixed(1)
-    : null;
 
   // eslint-disable-next-line no-unused-vars
   const fmtRp = (v) => v ? `Rp ${Number(v).toLocaleString('id-ID')}` : '';
@@ -585,17 +592,24 @@ function ProductFormModal({ product, onClose, onSaved }) {
                   )}
                 </div>
 
-                {/* SKU & Barcode */}
+                {/* Kode Produk & Barcode */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1.5">
                       <Hash size={14} className="text-gray-400" />
-                      Kode SKU
+                      Kode Produk
                     </label>
-                    <input type="text" name="sku" value={form.sku} onChange={handleChange}
-                      placeholder="Auto-generate jika kosong"
-                      readOnly={isEdit}
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition ${isEdit ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'}`} />
+                    <input
+                      type="text"
+                      name="sku"
+                      value={form.sku}
+                      readOnly
+                      placeholder={form.category === 'obat' ? 'Auto: F0001' : 'Auto: A0001'}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Dibuat otomatis oleh backend saat produk disimpan.
+                    </p>
                   </div>
                   <div>
                     <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1.5">
@@ -628,13 +642,13 @@ function ProductFormModal({ product, onClose, onSaved }) {
                   </div>
                   <div>
                     <label className="flex items-center gap-1 text-sm font-semibold text-gray-700 mb-1.5">
-                      Golongan Obat <span className="text-red-400">*</span>
+                      Golongan <span className="text-red-400">*</span>
                     </label>
                     <div className="relative">
                       <select name="golongan" value={form.golongan} onChange={handleChange}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white appearance-none pr-10">
+                        className={`w-full px-4 py-2.5 rounded-xl border hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white appearance-none pr-10 ${validationErrors.golongan ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}>
                         <option value="">-- Pilih Golongan --</option>
-                        {GOLONGAN_OBAT.map((g) => (
+                        {(GOLONGAN_BY_CATEGORY[form.category] || []).map((g) => (
                           <option key={g.value} value={g.value}>{g.label}</option>
                         ))}
                       </select>
@@ -645,15 +659,18 @@ function ProductFormModal({ product, onClose, onSaved }) {
                     {form.golongan && GOLONGAN_MAP[form.golongan] && (
                       <div className="mt-1.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          form.golongan === 'narkotika' ? 'bg-red-100 text-red-700' :
-                          form.golongan === 'psikotropika' ? 'bg-orange-100 text-orange-700' :
-                          form.golongan === 'obat_keras' ? 'bg-amber-100 text-amber-700' :
-                          'bg-blue-100 text-blue-700'
+                          GOLONGAN_MAP[form.golongan].color
                         }`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-current" />
                           {GOLONGAN_MAP[form.golongan].label}
                         </span>
                       </div>
+                    )}
+                    {validationErrors.golongan && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
+                        {validationErrors.golongan}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -666,11 +683,6 @@ function ProductFormModal({ product, onClose, onSaved }) {
                       <label className="text-sm font-medium text-gray-700 mb-1 block">Pabrik / Manufaktur</label>
                       <input type="text" name="manufacturer" value={form.manufacturer} onChange={handleChange}
                         placeholder="PT Sanbe Farma"
-                        className="w-full px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white" />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Negara Asal</label>
-                      <input type="text" name="countryOfOrigin" value={form.countryOfOrigin} onChange={handleChange}
                         className="w-full px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white" />
                     </div>
                   </div>
@@ -735,32 +747,6 @@ function ProductFormModal({ product, onClose, onSaved }) {
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Kekuatan / Dosis</label>
-                      <input type="text" name="kekuatan" value={form.kekuatan} onChange={handleChange}
-                        placeholder="500mg, 10mg/5mL"
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Golongan Terapi</label>
-                      <input type="text" name="golonganTerapi" value={form.golonganTerapi} onChange={handleChange}
-                        placeholder="Antibiotik, Analgesik"
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Suhu Penyimpanan (CDOB)</label>
-                      <div className="relative">
-                        <select name="suhuPenyimpanan" value={form.suhuPenyimpanan} onChange={handleChange}
-                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white appearance-none pr-10">
-                          {SUHU_PENYIMPANAN.map((s) => (
-                            <option key={s.value} value={s.value}>{s.label}</option>
-                          ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                          <ChevronDown size={16} />
-                        </div>
-                      </div>
-                    </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Zat Aktif / Komposisi</label>
@@ -772,7 +758,7 @@ function ProductFormModal({ product, onClose, onSaved }) {
               </div>
             )}
 
-            {/* ── Step 3: Harga & Stok ── */}
+            {/* ── Step 3: Satuan & Stok ── */}
             {activeTab === 2 && (
               <div className="space-y-5 animate-in fade-in">
                 {/* Unit Conversion Visual */}
@@ -816,65 +802,6 @@ function ProductFormModal({ product, onClose, onSaved }) {
                         1 {form.satuan} = {form.isiPerSatuan} {form.satuanKecil}
                       </p>
                     )}
-                  </div>
-                </div>
-
-                {/* Pricing Section */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <CircleDollarSign size={14} />
-                    Harga
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">HNA</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">Rp</span>
-                        <input type="number" name="hna" value={form.hna} onChange={handleChange}
-                          placeholder="0"
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">HET</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">Rp</span>
-                        <input type="number" name="het" value={form.het} onChange={handleChange}
-                          placeholder="0"
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Harga Beli</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">Rp</span>
-                        <input type="number" name="hargaBeli" value={form.hargaBeli} onChange={handleChange}
-                          placeholder="0"
-                          className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="flex items-center justify-between text-sm font-medium text-gray-700 mb-1">
-                        <span>Harga Jual</span>
-                        {marginPct !== null && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${Number(marginPct) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {Number(marginPct) >= 0 ? '▲' : '▼'} {marginPct}%
-                          </span>
-                        )}
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">Rp</span>
-                        <input type="number" name="hargaJual" value={form.hargaJual} onChange={handleChange}
-                          placeholder="0"
-                          className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm focus:ring-2 outline-none transition ${validationErrors.hargaJual ? 'border-amber-400 bg-amber-50 focus:ring-amber-200' : 'border-gray-200 hover:border-gray-300 focus:ring-emerald-500 focus:border-emerald-500'}`} />
-                      </div>
-                      {validationErrors.hargaJual && (
-                        <p className="flex items-center gap-1 text-xs text-amber-600 mt-1">
-                          <AlertTriangle size={14} className="shrink-0" />
-                          {validationErrors.hargaJual}
-                        </p>
-                      )}
-                    </div>
                   </div>
                 </div>
 
@@ -939,36 +866,14 @@ function ProductFormModal({ product, onClose, onSaved }) {
                 </div>
 
                 {/* Regulatory Warnings */}
-                {form.golongan === 'narkotika' && (
-                  <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-                      <AlertTriangle size={16} className="text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-red-800">Peringatan Narkotika</p>
-                      <p className="text-xs text-red-600 mt-0.5">Penyimpanan, distribusi, dan pelaporan wajib mengikuti ketentuan PP No. 40/2013. Diperlukan Surat Pesanan Khusus Narkotika.</p>
-                    </div>
-                  </div>
-                )}
-                {form.golongan === 'psikotropika' && (
-                  <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
-                    <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-                      <AlertTriangle size={16} className="text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-orange-800">Peringatan Psikotropika</p>
-                      <p className="text-xs text-orange-600 mt-0.5">Distribusi harus dilengkapi dengan Surat Pesanan Khusus Psikotropika sesuai UU No. 5/1997.</p>
-                    </div>
-                  </div>
-                )}
-                {(form.golongan === 'obat_keras' || form.golongan === 'obat_keras_terbatas') && (
+                {(form.golongan === 'prekursor' || form.golongan === 'obat_tertentu' || form.golongan === 'obat_keras') && (
                   <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
                     <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
                       <AlertTriangle size={16} className="text-amber-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-amber-800">Obat Keras</p>
-                      <p className="text-xs text-amber-600 mt-0.5">Distribusi wajib dengan Surat Pesanan (SP) dari fasilitas yang memiliki izin. Penyaluran sesuai ketentuan CDOB.</p>
+                      <p className="text-sm font-semibold text-amber-800">Perhatian Regulasi</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Untuk golongan ini, pastikan distribusi dan dokumentasi mengikuti ketentuan regulasi yang berlaku.</p>
                     </div>
                   </div>
                 )}
@@ -1016,11 +921,10 @@ function ProductFormModal({ product, onClose, onSaved }) {
 }
 
 /* Ã¢â€â‚¬Ã¢â€â‚¬ Product Detail Modal Ã¢â€â‚¬Ã¢â€â‚¬ */
-function ProductDetailModal({ product, onClose, canViewPrice }) {
+function ProductDetailModal({ product, onClose }) {
   const [activeTab, setActiveTab] = useState('umum');
   const gol = GOLONGAN_MAP[product.golongan];
   const stockSummary = product.stockSummary;
-  const suhuLabel = SUHU_PENYIMPANAN.find((s) => s.value === product.suhuPenyimpanan)?.label;
 
   const tabs = [
     { key: 'umum', label: 'Umum', icon: (
@@ -1029,8 +933,8 @@ function ProductDetailModal({ product, onClose, canViewPrice }) {
     { key: 'farmasi', label: 'Farmasi', icon: (
       <FlaskConical size={16} />
     )},
-    { key: 'harga', label: 'Harga & Stok', icon: (
-      <CircleDollarSign size={16} />
+    { key: 'harga', label: 'Satuan & Stok', icon: (
+      <SlidersHorizontal size={16} />
     )},
     { key: 'info', label: 'Info', icon: (
       <Info size={16} />
@@ -1128,16 +1032,15 @@ function ProductDetailModal({ product, onClose, canViewPrice }) {
               {/* 2-col grid */}
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 <DetailField label="Nama Produk" value={product.name} span={2} />
-                <DetailField label="Kode SKU" value={product.sku} mono />
+                <DetailField label="Kode Produk" value={product.sku} mono />
                 <DetailField label="Barcode" value={product.barcode} mono />
                 <DetailField label="Kategori" value={KATEGORI_LABELS[product.category] || product.category} />
-                <DetailField label="Golongan Obat" badge={gol} />
+                <DetailField label="Golongan" badge={gol} />
               </div>
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Produsen</p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                   <DetailField label="Pabrik / Manufacturer" value={product.manufacturer} />
-                  <DetailField label="Negara Asal" value={product.countryOfOrigin} />
                 </div>
               </div>
             </div>
@@ -1160,9 +1063,6 @@ function ProductDetailModal({ product, onClose, canViewPrice }) {
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 <DetailField label="Bentuk Sediaan" value={product.bentukSediaan} />
-                <DetailField label="Kekuatan / Dosis" value={product.kekuatan} />
-                <DetailField label="Golongan Terapi" value={product.golonganTerapi} />
-                <DetailField label="Suhu Penyimpanan" value={suhuLabel} />
               </div>
 
               {product.zatAktif && (
@@ -1173,36 +1073,14 @@ function ProductDetailModal({ product, onClose, canViewPrice }) {
               )}
 
               {/* Regulatory warnings */}
-              {product.golongan === 'narkotika' && (
-                <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-3.5">
-                  <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertTriangle size={16} className="text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-red-800 mb-0.5">Narkotika - PP No. 40/2013</p>
-                    <p className="text-xs text-red-600 leading-relaxed">Wajib SP Khusus Narkotika, penyimpanan lemari terkunci ganda, laporan bulanan ke Dinkes & BPOM.</p>
-                  </div>
-                </div>
-              )}
-              {product.golongan === 'psikotropika' && (
-                <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-3.5">
-                  <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertTriangle size={16} className="text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-orange-800 mb-0.5">Psikotropika - UU No. 5/1997</p>
-                    <p className="text-xs text-orange-600 leading-relaxed">Wajib SP Khusus Psikotropika, penyimpanan terpisah terkunci, laporan bulanan.</p>
-                  </div>
-                </div>
-              )}
-              {(product.golongan === 'obat_keras' || product.golongan === 'obat_keras_terbatas') && (
+              {(product.golongan === 'prekursor' || product.golongan === 'obat_tertentu' || product.golongan === 'obat_keras') && (
                 <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
                   <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
                     <CircleAlert size={16} className="text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-amber-800 mb-0.5">Obat Keras - CDOB</p>
-                    <p className="text-xs text-amber-600 leading-relaxed">Distribusi wajib dengan Surat Pesanan dari fasilitas berizin.</p>
+                    <p className="text-xs font-semibold text-amber-800 mb-0.5">Perhatian Regulasi</p>
+                    <p className="text-xs text-amber-600 leading-relaxed">Pastikan distribusi mengikuti ketentuan izin fasilitas dan regulasi yang berlaku.</p>
                   </div>
                 </div>
               )}
@@ -1234,25 +1112,6 @@ function ProductDetailModal({ product, onClose, canViewPrice }) {
                   )}
                 </div>
               </div>
-
-              {/* Pricing */}
-              {canViewPrice && (
-                <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Harga</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <PriceCard label="HNA" sublabel="Harga Netto Apotek" value={product.hna} accent="emerald" />
-                    <PriceCard label="HET" sublabel="Harga Eceran Tertinggi" value={product.het} accent="blue" />
-                    <PriceCard label="Harga Beli" sublabel="Harga perolehan" value={product.hargaBeli} accent="gray" />
-                    <PriceCard label="Harga Jual" sublabel="Harga ke pelanggan" value={product.hargaJual} accent="emerald" highlight />
-                  </div>
-                  {product.hargaJual && product.hargaBeli && product.hargaBeli > 0 && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                      <TrendingUp size={14} />
-                      Margin: {((product.hargaJual - product.hargaBeli) / product.hargaBeli * 100).toFixed(1)}%
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Other stok info */}
               <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-gray-100 pt-4">
@@ -1338,24 +1197,6 @@ function DetailField({ label, value, badge, mono, span }) {
   );
 }
 
-/* ── Price Card Component ── */
-function PriceCard({ label, sublabel, value, accent, highlight }) {
-  const colors = {
-    emerald: highlight ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200',
-    blue: 'bg-white border-gray-200',
-    gray: 'bg-white border-gray-200',
-  };
-  return (
-    <div className={`border rounded-xl p-3.5 ${colors[accent] || colors.gray}`}>
-      <p className="text-[11px] text-gray-400 mb-0.5">{sublabel}</p>
-      <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
-      <p className={`text-base font-bold tabular-nums ${highlight ? 'text-emerald-700' : 'text-gray-900'}`}>
-        {value ? formatCurrency(value) : '-'}
-      </p>
-    </div>
-  );
-}
-
 /* ── Delete Confirm Modal ── */
 function DeleteConfirmModal({ product, onClose, onConfirm }) {
   return (
@@ -1394,9 +1235,9 @@ function ImportModal({ onClose, onDone }) {
     try {
       const XLSX = await import('xlsx');
       const headers = [
-        'name','sku','barcode','category','golongan','bentukSediaan','kekuatan','zatAktif',
-        'satuan','isiPerSatuan','hna','hargaBeli','hargaJual','ppn','manufacturer','countryOfOrigin',
-        'nie','noBpom','stokMinimum','suhuPenyimpanan','isActive','notes'
+        'name','barcode','category','golongan','bentukSediaan','zatAktif',
+        'satuan','isiPerSatuan','ppn','manufacturer',
+        'nie','noBpom','stokMinimum','isActive','notes'
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers]);
       const wb = XLSX.utils.book_new();
@@ -1458,25 +1299,18 @@ function ImportModal({ onClose, onDone }) {
         const row = rows[i];
         const payload = {
           name: row.name || row.Nama || row.nama || '',
-          sku: row.sku || row.SKU || '',
           barcode: row.barcode || '',
           category: row.category || row.kategori || '',
           golongan: row.golongan || '',
           bentukSediaan: row.bentukSediaan || row.bentuk || '',
-          kekuatan: row.kekuatan || '',
           zatAktif: row.zatAktif || row.zat || '',
           satuan: row.satuan || '',
           isiPerSatuan: row.isiPerSatuan || row.isi || '',
-          hna: row.hna || 0,
-          hargaBeli: row.hargaBeli || 0,
-          hargaJual: row.hargaJual || 0,
           ppn: row.ppn === '' ? true : (String(row.ppn).toLowerCase() === 'true' || Number(row.ppn) === 1),
           manufacturer: row.manufacturer || row.produsen || '',
-          countryOfOrigin: row.countryOfOrigin || row.negara || 'Indonesia',
           nie: row.nie || '',
           noBpom: row.noBpom || '',
           stokMinimum: row.stokMinimum || 0,
-          suhuPenyimpanan: row.suhuPenyimpanan || '',
           isActive: row.isActive === '' ? true : (String(row.isActive).toLowerCase() === 'true' || Number(row.isActive) === 1),
           notes: row.notes || row.keterangan || '',
         };
@@ -1630,10 +1464,6 @@ function ImportModal({ onClose, onDone }) {
 }
 
 /* ── Helpers ── */
-function formatCurrency(value) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return '-';
   return new Date(dateStr).toLocaleDateString('id-ID', {

@@ -61,6 +61,17 @@ export default function StockMutation() {
     [setMutationFilters],
   );
 
+  const sortedMutations = useMemo(() => {
+    return [...mutations].sort((a, b) => {
+      const aTime = new Date(a?.mutationDate || a?.createdAt || 0).getTime();
+      const bTime = new Date(b?.mutationDate || b?.createdAt || 0).getTime();
+      if (aTime === bTime) {
+        return new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime();
+      }
+      return aTime - bTime;
+    });
+  }, [mutations]);
+
   const handleCreate = async (data) => {
     try {
       await createMutation(data);
@@ -181,7 +192,7 @@ export default function StockMutation() {
                     <p className="text-sm text-gray-400 mt-2">Memuat data mutasi...</p>
                   </td>
                 </tr>
-              ) : mutations.length === 0 ? (
+              ) : sortedMutations.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-5 py-12 text-center">
                     <ClipboardList className="w-10 h-10 text-gray-300 mx-auto" />
@@ -189,11 +200,14 @@ export default function StockMutation() {
                   </td>
                 </tr>
               ) : (
-                mutations.map((mut) => {
+                sortedMutations.map((mut, idx) => {
                   const mt = MUTATION_TYPE[mut.type] || MUTATION_TYPE.in;
                   const TypeIcon = mt.icon;
                   const prod = mut.productId && typeof mut.productId === 'object' ? mut.productId : {};
                   const isPositive = mut.quantity > 0;
+                  const currentPage = Number(mutationPagination?.page ?? mutationFilters?.page ?? 1);
+                  const currentLimit = Number(mutationPagination?.limit ?? mutationFilters?.limit ?? 10);
+                  const sequenceNumber = ((currentPage - 1) * currentLimit) + idx + 1;
 
                   return (
                     <tr
@@ -202,7 +216,7 @@ export default function StockMutation() {
                       onClick={() => setDetailModal(mut)}
                     >
                       <td className="px-5 py-3.5">
-                        <p className="font-mono text-xs font-medium text-gray-700">{mut.mutationNumber || '-'}</p>
+                        <p className="font-mono text-xs font-medium text-gray-700">{mut.mutationNumber || sequenceNumber}</p>
                       </td>
                       <td className="px-5 py-3.5">
                         <p className="text-xs text-gray-700">{formatDate(mut.mutationDate)}</p>

@@ -61,7 +61,7 @@ const useInventoryStore = create((set, get) => ({
   mutationLoading: false,
   mutationFilters: {
     page: 1, limit: 10, search: '', type: '', productId: '',
-    dateFrom: '', dateTo: '', sort: '-mutationDate',
+    dateFrom: '', dateTo: '', sort: 'mutationDate',
   },
 
   setMutationFilters: (newFilters) => {

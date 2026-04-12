@@ -242,7 +242,15 @@ const useFinanceStore = create((set, get) => ({
   fetchAccounts: async () => {
     try {
       const { data } = await financeService.getChartOfAccounts();
-      set({ accounts: data.data });
+      const raw = data?.data;
+      const normalizedAccounts = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.docs)
+          ? raw.docs
+          : Array.isArray(data?.docs)
+            ? data.docs
+            : [];
+      set({ accounts: normalizedAccounts });
     } catch { /* silent */ }
   },
 

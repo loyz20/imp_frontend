@@ -7,7 +7,7 @@ import Pagination from '../../components/Pagination';
 import toast from 'react-hot-toast';
 import {
   Plus, Eye, SquarePen, Trash2, X, Check, AlertTriangle,
-  Building2, Phone, Mail, MapPin, FileText, Globe, User,
+  Building2, Phone, MapPin, FileText, User,
   Loader2, ShieldCheck, Users, CreditCard, Clock, CheckCircle, Ban,
 } from 'lucide-react';
 
@@ -52,6 +52,7 @@ export default function CustomerManagement() {
 
   const canCrud = CAN_CRUD_ROLES.includes(userRole);
   const canDelete = CAN_DELETE_ROLES.includes(userRole);
+  const safeCustomers = Array.isArray(customers) ? customers : [];
 
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -201,7 +202,7 @@ export default function CustomerManagement() {
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Tipe</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Kontak</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Kota</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">SIA</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">Izin Sarana</th>
                 <th className="text-center px-5 py-3.5 font-semibold text-gray-600">Status</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Aksi</th>
               </tr>
@@ -214,7 +215,7 @@ export default function CustomerManagement() {
                     <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                   </td>
                 </tr>
-              ) : customers.length === 0 ? (
+              ) : safeCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
                     <Users className="w-10 h-10 text-gray-300 mx-auto" />
@@ -222,7 +223,7 @@ export default function CustomerManagement() {
                   </td>
                 </tr>
               ) : (
-                customers.map((customer) => (
+                safeCustomers.map((customer) => (
                   <tr key={cid(customer)} className="hover:bg-gray-50/50 transition-colors">
                     {/* Customer info */}
                     <td className="px-5 py-3.5">
@@ -254,11 +255,11 @@ export default function CustomerManagement() {
                     <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">
                       {customer.address?.city || '-'}
                     </td>
-                    {/* SIA */}
+                    {/* Izin Sarana */}
                     <td className="px-5 py-3.5 hidden xl:table-cell">
-                      {customer.siaLicense?.number ? (
+                      {(customer.izinSarana?.number || customer.siaLicense?.number) ? (
                         <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
-                          <ShieldCheck size={12} /> {customer.siaLicense.number}
+                          <ShieldCheck size={12} /> {customer.izinSarana?.number || customer.siaLicense?.number}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">-</span>
@@ -353,28 +354,31 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
     name: customer?.name || '',
     code: customer?.code || '',
     type: customer?.type || 'apotek',
+    ownerName: customer?.ownerName || '',
+    ownerAddress: customer?.ownerAddress || '',
     // Kontak
     contactPerson: customer?.contactPerson || '',
     phone: customer?.phone || '',
-    email: customer?.email || '',
-    website: customer?.website || '',
     // Alamat
     address: {
       street: customer?.address?.street || '',
       city: customer?.address?.city || '',
       province: customer?.address?.province || '',
-      postalCode: customer?.address?.postalCode || '',
-      country: customer?.address?.country || 'Indonesia',
     },
-    // SIA
-    siaLicense: {
-      number: customer?.siaLicense?.number || '',
-      expiryDate: customer?.siaLicense?.expiryDate ? customer.siaLicense.expiryDate.slice(0, 10) : '',
+    // Perizinan
+    izinSarana: {
+      number: customer?.izinSarana?.number || customer?.siaLicense?.number || '',
+      expiryDate: customer?.izinSarana?.expiryDate
+        ? customer.izinSarana.expiryDate.slice(0, 10)
+        : (customer?.siaLicense?.expiryDate ? customer.siaLicense.expiryDate.slice(0, 10) : ''),
     },
-    // Apoteker Penanggung Jawab
-    pharmacist: {
-      name: customer?.pharmacist?.name || '',
-      sipaNumber: customer?.pharmacist?.sipaNumber || '',
+    apoteker: {
+      name: customer?.apoteker?.name || customer?.pharmacist?.name || '',
+      address: customer?.apoteker?.address || customer?.pharmacist?.address || '',
+    },
+    sipa: {
+      number: customer?.sipa?.number || customer?.pharmacist?.sipaNumber || '',
+      expiryDate: customer?.sipa?.expiryDate ? customer.sipa.expiryDate.slice(0, 10) : '',
     },
     // Pembayaran
     paymentTermDays: customer?.paymentTermDays ?? 30,
@@ -386,6 +390,8 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
     },
     // Lainnya
     npwp: customer?.npwp || '',
+    npwpName: customer?.npwpName || '',
+    npwpAddress: customer?.npwpAddress || '',
     notes: customer?.notes || '',
     isActive: customer?.isActive ?? true,
   });
@@ -408,13 +414,53 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
       toast.error('Nama pelanggan wajib diisi');
       return;
     }
-    if (requireSIA && !form.siaLicense.number.trim()) {
-      toast.error('Nomor SIA wajib diisi (sesuai pengaturan)');
+    if (requireSIA && !form.izinSarana.number.trim()) {
+      toast.error('Nomor Izin Sarana wajib diisi (sesuai pengaturan)');
       return;
     }
     setLoading(true);
     try {
-      const payload = { ...form };
+      const toOptionalText = (value) => {
+        const text = typeof value === 'string' ? value.trim() : value;
+        return text ? text : null;
+      };
+      const toLicense = (license) => ({
+        number: toOptionalText(license?.number),
+        expiryDate: license?.expiryDate || null,
+      });
+
+      const payload = {
+        name: form.name.trim(),
+        type: form.type,
+        ownerName: toOptionalText(form.ownerName),
+        ownerAddress: toOptionalText(form.ownerAddress),
+        contactPerson: toOptionalText(form.contactPerson),
+        phone: toOptionalText(form.phone),
+        address: {
+          street: toOptionalText(form.address?.street),
+          city: toOptionalText(form.address?.city),
+          province: toOptionalText(form.address?.province),
+        },
+        izinSarana: toLicense(form.izinSarana),
+        apoteker: {
+          name: toOptionalText(form.apoteker?.name),
+          address: toOptionalText(form.apoteker?.address),
+        },
+        sipa: toLicense(form.sipa),
+        paymentTermDays: Number(form.paymentTermDays ?? 30),
+        creditLimit: Number(form.creditLimit ?? defaultCreditLimit ?? 0),
+        bankAccount: {
+          bankName: toOptionalText(form.bankAccount?.bankName),
+          accountNumber: toOptionalText(form.bankAccount?.accountNumber),
+          accountName: toOptionalText(form.bankAccount?.accountName),
+        },
+        npwp: toOptionalText(form.npwp),
+        npwpName: toOptionalText(form.npwpName),
+        npwpAddress: toOptionalText(form.npwpAddress),
+        notes: toOptionalText(form.notes),
+        isActive: !!form.isActive,
+      };
+
       if (isEdit) {
         await updateCustomer(cid(customer), payload);
         toast.success('Pelanggan berhasil diperbarui');
@@ -494,10 +540,11 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   <input
                     name="code"
                     value={form.code}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="CUS-001"
+                    readOnly
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm outline-none"
+                    placeholder="Auto-generate backend (C0001)"
                   />
+                  <p className="text-xs text-gray-500 mt-1.5">Kode pelanggan dibuat otomatis oleh backend.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe Pelanggan</label>
@@ -514,6 +561,27 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                 </div>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Pemilik</label>
+                <input
+                  name="ownerName"
+                  value={form.ownerName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                  placeholder="Nama pemilik customer"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Alamat Pemilik</label>
+                <textarea
+                  name="ownerAddress"
+                  value={form.ownerAddress}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition resize-none"
+                  placeholder="Alamat pemilik customer"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">NPWP</label>
                 <input
                   name="npwp"
@@ -521,6 +589,27 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                   placeholder="XX.XXX.XXX.X-XXX.XXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama NPWP</label>
+                <input
+                  name="npwpName"
+                  value={form.npwpName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                  placeholder="Nama sesuai NPWP"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Alamat NPWP</label>
+                <textarea
+                  name="npwpAddress"
+                  value={form.npwpAddress}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition resize-none"
+                  placeholder="Alamat sesuai NPWP"
                 />
               </div>
               <div>
@@ -572,27 +661,6 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                     placeholder="021-xxxxxxxx"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="info@apotek.co.id"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Website</label>
-                  <input
-                    name="website"
-                    value={form.website}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="https://apotek.co.id"
-                  />
-                </div>
               </div>
 
               <h3 className="text-sm font-semibold text-gray-800 pt-3">Alamat</h3>
@@ -622,22 +690,6 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode Pos</label>
-                  <input
-                    value={form.address.postalCode}
-                    onChange={(e) => handleNestedChange('address', 'postalCode', e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Negara</label>
-                  <input
-                    value={form.address.country}
-                    onChange={(e) => handleNestedChange('address', 'country', e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -648,28 +700,28 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <ShieldCheck size={16} className="text-emerald-600" />
-                  Surat Izin Apotek (SIA)
+                  Izin Sarana
                   {requireSIA && <span className="text-xs text-red-500 font-normal">* Wajib</span>}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Nomor SIA {requireSIA && <span className="text-red-500">*</span>}
+                      Nomor Izin Sarana {requireSIA && <span className="text-red-500">*</span>}
                     </label>
                     <input
-                      value={form.siaLicense.number}
-                      onChange={(e) => handleNestedChange('siaLicense', 'number', e.target.value)}
+                      value={form.izinSarana.number}
+                      onChange={(e) => handleNestedChange('izinSarana', 'number', e.target.value)}
                       required={requireSIA}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                      placeholder="SIA-XXXXXXXXXX"
+                      placeholder="IS-XXXXXXXXXX"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired</label>
                     <input
                       type="date"
-                      value={form.siaLicense.expiryDate}
-                      onChange={(e) => handleNestedChange('siaLicense', 'expiryDate', e.target.value)}
+                      value={form.izinSarana.expiryDate}
+                      onChange={(e) => handleNestedChange('izinSarana', 'expiryDate', e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
@@ -679,25 +731,43 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <User size={16} className="text-blue-600" />
-                  Apoteker Penanggung Jawab
+                  Apoteker
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Apoteker</label>
                     <input
-                      value={form.pharmacist.name}
-                      onChange={(e) => handleNestedChange('pharmacist', 'name', e.target.value)}
+                      value={form.apoteker.name}
+                      onChange={(e) => handleNestedChange('apoteker', 'name', e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                       placeholder="apt. Nama Apoteker"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">No. SIPA</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Alamat Apoteker</label>
                     <input
-                      value={form.pharmacist.sipaNumber}
-                      onChange={(e) => handleNestedChange('pharmacist', 'sipaNumber', e.target.value)}
+                      value={form.apoteker.address}
+                      onChange={(e) => handleNestedChange('apoteker', 'address', e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      placeholder="Alamat apoteker"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor SIPA</label>
+                    <input
+                      value={form.sipa.number}
+                      onChange={(e) => handleNestedChange('sipa', 'number', e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                       placeholder="SIPA-XXXXXXXXXX"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired SIPA</label>
+                    <input
+                      type="date"
+                      value={form.sipa.expiryDate}
+                      onChange={(e) => handleNestedChange('sipa', 'expiryDate', e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
                 </div>
@@ -709,8 +779,8 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   <div>
                     <p className="text-sm font-medium text-amber-800">Regulasi Perizinan</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      Sesuai regulasi BPOM, setiap pelanggan apotek/rumah sakit harus memiliki SIA dan Apoteker Penanggung Jawab yang valid.
-                      Sistem akan memberikan peringatan jika SIA mendekati masa expired.
+                      Pastikan Nomor Izin Sarana dan Nomor SIPA tetap valid.
+                      Sistem akan memberikan peringatan jika masa berlaku mendekati expired.
                     </p>
                   </div>
                 </div>
@@ -934,7 +1004,11 @@ function CustomerDetailModal({ customer, onClose }) {
               <InfoRow label="Nama Pelanggan" value={customer.name} icon={Building2} />
               <InfoRow label="Kode" value={customer.code} icon={FileText} />
               <InfoRow label="Tipe" value={TYPE_LABELS[customer.type] || customer.type} icon={Users} />
+              <InfoRow label="Nama Pemilik" value={customer.ownerName} icon={User} />
+              <InfoRow label="Alamat Pemilik" value={customer.ownerAddress} icon={MapPin} />
               <InfoRow label="NPWP" value={customer.npwp} icon={FileText} />
+              <InfoRow label="Nama NPWP" value={customer.npwpName} icon={FileText} />
+              <InfoRow label="Alamat NPWP" value={customer.npwpAddress} icon={MapPin} />
               <InfoRow label="Catatan" value={customer.notes} icon={FileText} />
             </div>
           )}
@@ -946,8 +1020,6 @@ function CustomerDetailModal({ customer, onClose }) {
                 <div className="space-y-1">
                   <InfoRow label="Nama Kontak" value={customer.contactPerson} icon={User} />
                   <InfoRow label="Telepon" value={customer.phone} icon={Phone} />
-                  <InfoRow label="Email" value={customer.email} icon={Mail} />
-                  <InfoRow label="Website" value={customer.website} icon={Globe} />
                 </div>
               </div>
               <div>
@@ -956,8 +1028,6 @@ function CustomerDetailModal({ customer, onClose }) {
                   <InfoRow label="Jalan" value={customer.address?.street} icon={MapPin} />
                   <InfoRow label="Kota" value={customer.address?.city} />
                   <InfoRow label="Provinsi" value={customer.address?.province} />
-                  <InfoRow label="Kode Pos" value={customer.address?.postalCode} />
-                  <InfoRow label="Negara" value={customer.address?.country} />
                 </div>
               </div>
             </div>
@@ -968,20 +1038,20 @@ function CustomerDetailModal({ customer, onClose }) {
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <ShieldCheck size={16} className="text-emerald-600" />
-                  Surat Izin Apotek (SIA)
+                  Izin Sarana
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-400">Nomor SIA</p>
-                      <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.siaLicense?.number || '-'}</p>
+                      <p className="text-xs text-gray-400">Nomor Izin Sarana</p>
+                      <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.izinSarana?.number || customer.siaLicense?.number || '-'}</p>
                     </div>
-                    <LicenseStatus date={customer.siaLicense?.expiryDate} />
+                    <LicenseStatus date={customer.izinSarana?.expiryDate || customer.siaLicense?.expiryDate} />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Tanggal Expired</p>
-                    <p className={`text-sm font-medium mt-0.5 ${isExpired(customer.siaLicense?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
-                      {formatDate(customer.siaLicense?.expiryDate)}
+                    <p className={`text-sm font-medium mt-0.5 ${isExpired(customer.izinSarana?.expiryDate || customer.siaLicense?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
+                      {formatDate(customer.izinSarana?.expiryDate || customer.siaLicense?.expiryDate)}
                     </p>
                   </div>
                 </div>
@@ -990,16 +1060,26 @@ function CustomerDetailModal({ customer, onClose }) {
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <User size={16} className="text-blue-600" />
-                  Apoteker Penanggung Jawab
+                  Apoteker
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div>
                     <p className="text-xs text-gray-400">Nama Apoteker</p>
-                    <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.pharmacist?.name || '-'}</p>
+                    <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.apoteker?.name || customer.pharmacist?.name || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">No. SIPA</p>
-                    <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.pharmacist?.sipaNumber || '-'}</p>
+                    <p className="text-xs text-gray-400">Alamat Apoteker</p>
+                    <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.apoteker?.address || customer.pharmacist?.address || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Nomor SIPA</p>
+                    <p className="text-sm font-medium text-gray-800 mt-0.5">{customer.sipa?.number || customer.pharmacist?.sipaNumber || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Tanggal Expired SIPA</p>
+                    <p className={`text-sm font-medium mt-0.5 ${isExpired(customer.sipa?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
+                      {formatDate(customer.sipa?.expiryDate)}
+                    </p>
                   </div>
                 </div>
               </div>

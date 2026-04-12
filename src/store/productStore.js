@@ -44,8 +44,9 @@ const useProductStore = create((set, get) => ({
       if (filters.sort) params.sort = filters.sort;
 
       const { data } = await productService.getAll(params);
+      const productList = Array.isArray(data?.data) ? data.data : [];
       set({
-        products: data.data,
+        products: productList,
         pagination: data.meta?.pagination || null,
         isLoading: false,
       });

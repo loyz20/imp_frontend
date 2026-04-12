@@ -62,6 +62,14 @@ export const DEFAULT_SETTINGS = {
       name: '', sipaNumber: '', straNumber: '',
       sipaExpiry: null, straExpiry: null, phone: '', email: '',
     },
+    responsiblePharmacistObat: {
+      name: '', sipaNumber: '', straNumber: '',
+      sipaExpiry: null, straExpiry: null, phone: '', email: '',
+    },
+    responsiblePharmacistAlkes: {
+      name: '', sipaNumber: '', straNumber: '',
+      sipaExpiry: null, straExpiry: null, phone: '', email: '',
+    },
     tax: { npwp: '', isPkp: false, defaultPpnRate: 11 },
   },
   invoice: { prefix: 'INV', autoNumber: true, defaultPaymentTermDays: 30 },

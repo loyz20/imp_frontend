@@ -45,15 +45,29 @@ export default function AccountsPayable() {
     [setFilters],
   );
 
-  const agingSummary = useMemo(() => {
-    const summary = { current: 0, '31-60': 0, '61-90': 0, '90+': 0, total: 0 };
+  const payableSummary = useMemo(() => {
+    const summary = {
+      totalOutstanding: 0,
+      current: 0,
+      overdue: 0,
+      invoiceCount: 0,
+      overdueCount: 0,
+    };
+
     (payables || []).forEach((p) => {
-      summary.current += p.agingCurrent || 0;
-      summary['31-60'] += p.aging31to60 || 0;
-      summary['61-90'] += p.aging61to90 || 0;
-      summary['90+'] += p.aging90plus || 0;
-      summary.total += p.totalOutstanding || 0;
+      const remaining = Number(p?.remainingAmount ?? p?.totalOutstanding ?? 0);
+      const daysOverdue = Number(p?.daysOverdue ?? 0);
+
+      summary.invoiceCount += 1;
+      summary.totalOutstanding += remaining;
+      if (daysOverdue > 0) {
+        summary.overdue += remaining;
+        summary.overdueCount += 1;
+      } else {
+        summary.current += remaining;
+      }
     });
+
     return summary;
   }, [payables]);
 
@@ -89,11 +103,11 @@ export default function AccountsPayable() {
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Total Hutang', value: agingSummary.total, color: 'from-red-500 to-red-600', icon: CircleDollarSign },
-          { label: 'Lancar (0-30)', value: agingSummary.current, color: 'from-emerald-500 to-emerald-600', icon: CheckCircle },
-          { label: '31-60 Hari', value: agingSummary['31-60'], color: 'from-amber-500 to-amber-600', icon: Clock },
-          { label: '61-90 Hari', value: agingSummary['61-90'], color: 'from-orange-500 to-orange-600', icon: AlertTriangle },
-          { label: '> 90 Hari', value: agingSummary['90+'], color: 'from-red-500 to-red-600', icon: AlertTriangle },
+          { label: 'Total Hutang', value: payableSummary.totalOutstanding, color: 'from-red-500 to-red-600', icon: CircleDollarSign, type: 'currency' },
+          { label: 'Lancar', value: payableSummary.current, color: 'from-emerald-500 to-emerald-600', icon: CheckCircle, type: 'currency' },
+          { label: 'Jatuh Tempo', value: payableSummary.overdue, color: 'from-amber-500 to-amber-600', icon: AlertTriangle, type: 'currency' },
+          { label: 'Jumlah Invoice', value: payableSummary.invoiceCount, color: 'from-blue-500 to-blue-600', icon: Clock, type: 'count' },
+          { label: 'Invoice Overdue', value: payableSummary.overdueCount, color: 'from-orange-500 to-orange-600', icon: AlertTriangle, type: 'count' },
         ].map((s) => {
           const Icon = s.icon;
           return (
@@ -103,7 +117,7 @@ export default function AccountsPayable() {
                 <div className={`w-9 h-9 rounded-xl bg-linear-to-br ${s.color} flex items-center justify-center shadow-sm`}>
                   <Icon size={16} className="text-white" strokeWidth={2} />
                 </div>
-                <span className="text-lg font-bold text-gray-900">{formatCurrency(s.value)}</span>
+                <span className="text-lg font-bold text-gray-900">{s.type === 'currency' ? formatCurrency(s.value) : s.value}</span>
               </div>
             </div>
           );
@@ -148,40 +162,49 @@ export default function AccountsPayable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">Supplier</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Lancar</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">31-60</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">61-90</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">&gt;90</th>
-                <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Total</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">Invoice</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Supplier</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Invoice</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Jatuh Tempo</th>
+                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">Total</th>
+                <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">Terbayar</th>
+                <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Sisa</th>
+                <th className="text-center px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Overdue</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center">
+                <tr><td colSpan={9} className="px-5 py-12 text-center">
                   <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
                   <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                 </td></tr>
               ) : (payables || []).length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-12 text-center">
+                <tr><td colSpan={9} className="px-5 py-12 text-center">
                   <TrendingDown className="w-10 h-10 text-gray-300 mx-auto" />
                   <p className="text-sm text-gray-400 mt-2">Tidak ada hutang ditemukan.</p>
                 </td></tr>
               ) : (
                 payables.map((p) => (
-                  <tr key={p.supplier?._id || p._id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={p._id || p.id || p.invoiceNumber} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{p.supplier?.name || '-'}</p>
-                      <p className="text-xs text-gray-400">{p.supplier?.code || ''} · {p.poCount || p.invoiceCount || 0} dokumen</p>
+                      <p className="font-medium text-gray-900">{p.invoiceNumber || '-'}</p>
+                      <p className="text-xs text-gray-400">Status: {p.status || '-'}</p>
                     </td>
-                    <td className="px-5 py-3.5 text-right text-gray-600 hidden md:table-cell">{formatCurrency(p.agingCurrent)}</td>
-                    <td className="px-5 py-3.5 text-right text-gray-600 hidden lg:table-cell">{formatCurrency(p.aging31to60)}</td>
-                    <td className="px-5 py-3.5 text-right text-gray-600 hidden lg:table-cell">{formatCurrency(p.aging61to90)}</td>
-                    <td className="px-5 py-3.5 text-right text-gray-600 hidden xl:table-cell">
-                      <span className={p.aging90plus > 0 ? 'text-red-600 font-medium' : ''}>{formatCurrency(p.aging90plus)}</span>
+                    <td className="px-5 py-3.5 hidden md:table-cell">
+                      <p className="text-gray-800 truncate">{p.supplierId?.name || '-'}</p>
+                      <p className="text-xs text-gray-400">{p.supplierId?.code || ''}</p>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">{formatCurrency(p.totalOutstanding)}</td>
+                    <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">{formatDate(p.invoiceDate)}</td>
+                    <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">{formatDate(p.dueDate)}</td>
+                    <td className="px-5 py-3.5 text-right text-gray-600 hidden xl:table-cell">{formatCurrency(p.totalAmount)}</td>
+                    <td className="px-5 py-3.5 text-right text-gray-600 hidden xl:table-cell">{formatCurrency(p.paidAmount)}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">{formatCurrency(p.remainingAmount)}</td>
+                    <td className="px-5 py-3.5 text-center hidden md:table-cell">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${Number(p.daysOverdue || 0) > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                        {Number(p.daysOverdue || 0) > 0 ? `${p.daysOverdue} hari` : 'Lancar'}
+                      </span>
+                    </td>
                     <td className="px-5 py-3.5 text-right">
                       <button
                         type="button"
@@ -399,6 +422,11 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
@@ -406,6 +434,9 @@ function debounce(fn, ms) {
 
 function extractInvoiceId(row) {
   if (!row) return '';
+
+  if (typeof row?._id === 'string' && row._id) return row._id;
+  if (typeof row?.id === 'string' && row.id) return row.id;
 
   const direct =
     row.invoiceId
@@ -425,6 +456,7 @@ function extractInvoiceId(row) {
 }
 
 function getOutstandingInvoice(row) {
+  if (row?.invoiceNumber || row?.remainingAmount != null) return row;
   const invoices = Array.isArray(row?.invoices) ? row.invoices : [];
   return invoices.find((inv) => (inv?.remainingAmount ?? inv?.outstandingAmount ?? 0) > 0) || invoices[0] || null;
 }

@@ -17,16 +17,15 @@ import {
 /* ── Constants ── */
 const SO_STATUS = [
   { value: 'draft', label: 'Draft', color: 'bg-slate-50 text-slate-700 border-slate-200', icon: FileText },
-  { value: 'packed', label: 'Dikemas', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Package },
-  { value: 'delivered', label: 'Terkirim', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle },
-  { value: 'partial_delivered', label: 'Terkirim Sebagian', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: Truck },
+  { value: 'shipped', label: 'Dikirim', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Truck },
+  { value: 'awaiting_payment', label: 'Menunggu Pembayaran', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: AlertTriangle },
   { value: 'completed', label: 'Selesai', color: 'bg-teal-50 text-teal-700 border-teal-200', icon: CheckCircle },
   { value: 'returned', label: 'Diretur', color: 'bg-orange-50 text-orange-700 border-orange-200', icon: Ban },
-  { value: 'canceled', label: 'Dibatalkan', color: 'bg-red-50 text-red-600 border-red-200', icon: Ban },
 ];
 
 const STATUS_MAP = Object.fromEntries(SO_STATUS.map((s) => [s.value, s]));
-STATUS_MAP.cancelled = STATUS_MAP.canceled;
+STATUS_MAP.canceled = STATUS_MAP.returned;
+STATUS_MAP.cancelled = STATUS_MAP.returned;
 
 /* ── Role helpers ── */
 const CAN_CRUD_ROLES = ['superadmin', 'admin', 'sales'];
@@ -38,7 +37,7 @@ const CAN_DELETE_ROLES = ['superadmin', 'admin'];
 export default function SalesOrder() {
   const {
     orders, stats, pagination, isLoading, filters,
-    fetchOrders, fetchStats, setFilters, deleteOrder, changeStatus,
+    fetchOrders, fetchStats, setFilters, deleteOrder, changeStatus, generateInvoice,
   } = useSalesOrderStore();
   const currentUser = useAuthStore((s) => s.user);
   const userRole = currentUser?.role || '';
@@ -52,6 +51,8 @@ export default function SalesOrder() {
   const [editingOrder, setEditingOrder] = useState(null);
   const [showDetail, setShowDetail] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -61,6 +62,21 @@ export default function SalesOrder() {
   const handleSearch = useMemo(
     () => debounce((value) => setFilters({ search: value }), 400),
     [setFilters],
+  );
+
+  const selectableOrders = useMemo(
+    () => (orders || []).filter((o) => normalizeSOStatus(o.status) === 'shipped'),
+    [orders],
+  );
+
+  const selectableOrderIdSet = useMemo(
+    () => new Set(selectableOrders.map((o) => oid(o))),
+    [selectableOrders],
+  );
+
+  const selectedOrders = useMemo(
+    () => (orders || []).filter((o) => selectedOrderIds.includes(oid(o))),
+    [orders, selectedOrderIds],
   );
 
   const openCreate = () => { setEditingOrder(null); setShowForm(true); };
@@ -91,6 +107,67 @@ export default function SalesOrder() {
     }
   };
 
+  const toggleOrderSelection = (order) => {
+    const orderId = oid(order);
+    if (!selectableOrderIdSet.has(orderId)) return;
+
+    setSelectedOrderIds((prev) => (
+      prev.includes(orderId)
+        ? prev.filter((id) => id !== orderId)
+        : [...prev, orderId]
+    ));
+  };
+
+  const toggleSelectAllShipped = () => {
+    const allIds = selectableOrders.map((o) => oid(o));
+    if (allIds.length === 0) return;
+
+    setSelectedOrderIds((prev) => {
+      const allSelected = allIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !allIds.includes(id));
+      }
+      const merged = new Set([...prev, ...allIds]);
+      return Array.from(merged);
+    });
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (selectedOrders.length === 0) {
+      toast.error('Pilih minimal 1 surat jalan berstatus dikirim');
+      return;
+    }
+
+    const allShipped = selectedOrders.every((o) => normalizeSOStatus(o.status) === 'shipped');
+    if (!allShipped) {
+      toast.error('Semua surat jalan yang dipilih harus berstatus dikirim');
+      return;
+    }
+
+    const customerIds = Array.from(new Set(selectedOrders.map((o) => resolveCustomerIdStr(o)).filter(Boolean)));
+    if (customerIds.length !== 1) {
+      toast.error('Semua surat jalan harus dari customer yang sama');
+      return;
+    }
+
+    setIsGeneratingInvoice(true);
+    try {
+      const payloadIds = selectedOrders.map((o) => oid(o));
+      const res = await generateInvoice(payloadIds);
+      const invoiceNumber = res?.data?.invoiceNumber || res?.invoiceNumber;
+      toast.success(invoiceNumber
+        ? `Invoice ${invoiceNumber} berhasil dibuat dari ${payloadIds.length} surat jalan`
+        : `Invoice berhasil dibuat dari ${payloadIds.length} surat jalan`);
+      setSelectedOrderIds([]);
+      fetchOrders();
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal generate invoice dari surat jalan terpilih');
+    } finally {
+      setIsGeneratingInvoice(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -98,16 +175,28 @@ export default function SalesOrder() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Penjualan (Sales Order)</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Kelola alur status SO: draft ke packed, packed ke delivered, delivered ke partial delivered, returned, atau completed.
+            Kelola alur status SO: draft ke dikirim, generate invoice diproses backend (gabung beberapa surat jalan), lalu menunggu pembayaran dan selesai.
             {soPrefix && <span className="ml-1 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">Prefix: {soPrefix}</span>}
           </p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-50 text-slate-700 border border-slate-200">Draft</span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Packed</span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Delivered</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Dikirim</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">Menunggu Pembayaran</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canCrud && (
+            <button
+              type="button"
+              onClick={handleGenerateInvoice}
+              disabled={isGeneratingInvoice || selectedOrders.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              title="Generate 1 invoice dari beberapa surat jalan berstatus dikirim"
+            >
+              {isGeneratingInvoice ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+              Generate Invoice ({selectedOrders.length})
+            </button>
+          )}
           {canCrud && (
             <button
               onClick={openCreate}
@@ -125,10 +214,9 @@ export default function SalesOrder() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
             { label: 'Total SO', value: stats.total ?? 0, color: 'from-indigo-500 to-indigo-600', icon: ClipboardList },
-            { label: 'Dikemas', value: stats.packed ?? 0, color: 'from-blue-500 to-blue-600', icon: Package },
-            { label: 'Terkirim', value: stats.delivered ?? 0, color: 'from-emerald-500 to-emerald-600', icon: CheckCircle },
-            { label: 'Diretur', value: stats.returned ?? 0, color: 'from-orange-500 to-orange-600', icon: Ban },
-            { label: 'Dibatalkan', value: stats.canceled ?? stats.cancelled ?? 0, color: 'from-red-500 to-red-600', icon: Ban },
+            { label: 'Dikirim', value: stats.shipped ?? stats.delivered ?? stats.packed ?? 0, color: 'from-blue-500 to-blue-600', icon: Truck },
+            { label: 'Menunggu Pembayaran', value: stats.awaitingPayment ?? stats.awaiting_payment ?? stats.invoiced ?? 0, color: 'from-amber-500 to-amber-600', icon: AlertTriangle },
+            { label: 'Selesai', value: stats.completed ?? 0, color: 'from-emerald-500 to-emerald-600', icon: CheckCircle },
           ].map((s) => {
             const Icon = s.icon;
             return (
@@ -152,7 +240,7 @@ export default function SalesOrder() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Cari nomor SO, pelanggan..."
+              placeholder="Cari no surat jalan, pelanggan..."
               defaultValue={filters.search}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
@@ -201,6 +289,16 @@ export default function SalesOrder() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="text-center px-3 py-3.5 font-semibold text-gray-600 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectableOrders.length > 0 && selectableOrders.every((o) => selectedOrderIds.includes(oid(o)))}
+                    onChange={toggleSelectAllShipped}
+                    disabled={!canCrud || selectableOrders.length === 0}
+                    className="rounded border-gray-300"
+                    title="Pilih semua SO berstatus dikirim"
+                  />
+                </th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. SO</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Pelanggan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Order</th>
@@ -213,14 +311,14 @@ export default function SalesOrder() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
+                  <td colSpan={8} className="px-5 py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
                     <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
+                  <td colSpan={8} className="px-5 py-12 text-center">
                     <ShoppingBag className="w-10 h-10 text-gray-300 mx-auto" />
                     <p className="text-sm text-gray-400 mt-2">Tidak ada SO ditemukan.</p>
                   </td>
@@ -228,12 +326,25 @@ export default function SalesOrder() {
               ) : (
                 orders.map((order) => {
                   const normalizedStatus = normalizeSOStatus(order.status);
-                  const st = STATUS_MAP[normalizedStatus] || STATUS_MAP.packed;
+                  const st = STATUS_MAP[normalizedStatus] || STATUS_MAP.shipped;
                   const allowedTransitions = canCrud ? getAllowedStatusTransitions(normalizedStatus) : [];
+                  const orderId = oid(order);
+                  const isSelectable = normalizedStatus === 'shipped';
+                  const isSelected = selectedOrderIds.includes(orderId);
                   return (
-                    <tr key={oid(order)} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={orderId} className={`hover:bg-gray-50/50 transition-colors ${isSelected ? 'bg-indigo-50/40' : ''}`}>
+                      <td className="px-3 py-3.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOrderSelection(order)}
+                          disabled={!canCrud || !isSelectable}
+                          className="rounded border-gray-300"
+                          title={isSelectable ? 'Pilih untuk generate invoice gabungan' : 'Hanya status dikirim yang dapat dipilih'}
+                        />
+                      </td>
                       <td className="px-5 py-3.5">
-                        <p className="font-medium text-gray-900">{getOrderInvoiceNumber(order)}</p>
+                        <p className="font-medium text-gray-900">{getOrderSuratJalanNumber(order)}</p>
                         {order.notes && (
                           <p className="text-xs text-gray-400 truncate max-w-50">{order.notes}</p>
                         )}
@@ -282,7 +393,7 @@ export default function SalesOrder() {
                           {canCrud && allowedTransitions.length > 0 && (
                             <>
                               {allowedTransitions.map((action) => {
-                                const actionStatus = STATUS_MAP[normalizeSOStatus(action.value)] || STATUS_MAP.packed;
+                                const actionStatus = STATUS_MAP[normalizeSOStatus(action.value)] || STATUS_MAP.shipped;
                                 const ActionIcon = actionStatus.icon;
                                 return (
                                   <button
@@ -298,7 +409,7 @@ export default function SalesOrder() {
                               })}
                             </>
                           )}
-                          {canDelete && (normalizedStatus === 'draft' || normalizedStatus === 'canceled') && (
+                          {canDelete && normalizedStatus === 'draft' && (
                             <button
                               onClick={() => setDeleteConfirm(order)}
                               className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
@@ -363,7 +474,6 @@ function SOFormModal({ order, onClose, onSaved }) {
   }, [stockMap]);
 
   const [form, setForm] = useState({
-    invoiceNumber: getOrderInvoiceNumber(order),
     customerId: resolveCustomerIdStr(order),
     customerName: resolveCustomer(order)?.name || '',
     orderDate: order?.orderDate ? order.orderDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -383,12 +493,100 @@ function SOFormModal({ order, onClose, onSaved }) {
           batchNumber: item.batchNumber || '',
           expiryDate: toDateInputValue(item.expiryDate),
           unitPrice: item.unitPrice || 0,
-          margin: Number(item.margin ?? 0),
+          margin: Number(item.margin ?? 20),
           discount: item.discount || 0,
           notes: item.notes || '',
+          _splitFrom: item._splitFrom || '',
+          _batchLocked: Boolean(item._batchLocked),
         }))
       : [emptyItem()],
   });
+
+  const applyAutoSplitForLine = useCallback((sourceItems, index) => {
+    const items = sourceItems.map((entry) => ({ ...entry }));
+    const item = items[index];
+    if (!item) return { items, addedCount: 0, hasRemainder: false };
+
+    const requestedQty = Number(item.quantity) || 0;
+    if (requestedQty <= 0 || !item.productId || !(item.batchRef || item.batchNumber)) {
+      return { items, addedCount: 0, hasRemainder: false };
+    }
+
+    const batches = getFefoSortedBatches(stockMap[item.productId]?.batches || []);
+    const selectedIdx = batches.findIndex((batch) => (
+      getBatchOptionValue(batch) === String(item.batchRef || '')
+      || String(batch.batchNumber || '') === String(item.batchNumber || '')
+    ));
+    if (selectedIdx < 0) return { items, addedCount: 0, hasRemainder: false };
+
+    const selectedBatch = batches[selectedIdx];
+    const selectedAvailable = getBatchAvailableQty(selectedBatch);
+    const selectedRef = getBatchOptionValue(selectedBatch);
+
+    if (requestedQty <= selectedAvailable) {
+      items[index] = {
+        ...items[index],
+        batchRef: selectedRef,
+        batchNumber: selectedBatch.batchNumber || '',
+        expiryDate: toDateInputValue(selectedBatch.expiryDate),
+        _batchLocked: false,
+      };
+      return { items, addedCount: 0, hasRemainder: false };
+    }
+
+    let remaining = requestedQty;
+    items[index] = {
+      ...items[index],
+      quantity: selectedAvailable,
+      batchRef: selectedRef,
+      batchNumber: selectedBatch.batchNumber || '',
+      expiryDate: toDateInputValue(selectedBatch.expiryDate),
+      _batchLocked: true,
+    };
+    remaining -= selectedAvailable;
+
+    const usedBatches = new Set(
+      items
+        .filter((entry, entryIndex) => entryIndex !== index && entry.productId === item.productId)
+        .map((entry) => String(entry.batchNumber || entry.batchRef || ''))
+        .filter(Boolean),
+    );
+    usedBatches.add(String(selectedBatch.batchNumber || selectedRef));
+
+    const autoLines = [];
+    for (let batchIndex = selectedIdx + 1; batchIndex < batches.length && remaining > 0; batchIndex += 1) {
+      const batch = batches[batchIndex];
+      const batchKey = String(batch.batchNumber || getBatchOptionValue(batch));
+      if (!batchKey || usedBatches.has(batchKey)) continue;
+
+      const availableQty = getBatchAvailableQty(batch);
+      if (availableQty <= 0) continue;
+
+      const allocatedQty = Math.min(availableQty, remaining);
+      autoLines.push({
+        ...item,
+        quantity: allocatedQty,
+        batchRef: getBatchOptionValue(batch),
+        batchNumber: batch.batchNumber || '',
+        expiryDate: toDateInputValue(batch.expiryDate),
+        notes: '',
+        _splitFrom: item.productId,
+        _batchLocked: true,
+      });
+      usedBatches.add(batchKey);
+      remaining -= allocatedQty;
+    }
+
+    if (autoLines.length > 0) {
+      items.splice(index + 1, 0, ...autoLines);
+    }
+
+    return {
+      items,
+      addedCount: autoLines.length,
+      hasRemainder: remaining > 0,
+    };
+  }, [stockMap]);
 
   // On edit: fetch stock for existing items
   useEffect(() => {
@@ -403,45 +601,93 @@ function SOFormModal({ order, onClose, onSaved }) {
   useEffect(() => {
     setForm((prev) => {
       let changed = false;
-      const items = prev.items.map((item) => {
-        if (!item.productId) return item;
+      let items = prev.items.map((item) => ({ ...item }));
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        if (!item.productId) continue;
+
         const productStock = stockMap[item.productId];
-        if (!productStock?.batches?.length) return item;
+        if (!productStock?.batches?.length) continue;
 
         const fefoBatches = getFefoSortedBatches(productStock.batches);
+        const firstAvailableBatch = fefoBatches.find((batch) => getBatchAvailableQty(batch) > 0);
         const selected = findBatchByValue(fefoBatches, item.batchRef || item.batchNumber);
 
         if (selected) {
+          let activeBatch = selected;
           const selectedRef = getBatchOptionValue(selected);
-          if (item.batchRef !== selectedRef) {
+
+          // If the currently selected batch has no stock, auto-switch to the first available FEFO batch.
+          if (getBatchAvailableQty(selected) <= 0 && firstAvailableBatch && getBatchOptionValue(firstAvailableBatch) !== selectedRef) {
+            const baseBatchPrice = getBatchBaseUnitPrice(firstAvailableBatch);
+            items[index] = {
+              ...item,
+              batchRef: getBatchOptionValue(firstAvailableBatch),
+              batchNumber: firstAvailableBatch.batchNumber || '',
+              expiryDate: toDateInputValue(firstAvailableBatch.expiryDate),
+              unitPrice: applyPriceRounding(
+                calculateSellingPriceFromMargin(baseBatchPrice, item.margin),
+                prev.priceRoundingStep,
+              ),
+            };
             changed = true;
-            return { ...item, batchRef: selectedRef };
+            activeBatch = firstAvailableBatch;
           }
-          return item;
+
+          const activeRef = getBatchOptionValue(activeBatch);
+          if (
+            items[index].batchRef !== activeRef
+            || items[index].batchNumber !== (activeBatch.batchNumber || '')
+            || toDateInputValue(items[index].expiryDate) !== toDateInputValue(activeBatch.expiryDate)
+          ) {
+            items[index] = {
+              ...items[index],
+              batchRef: activeRef,
+              batchNumber: activeBatch.batchNumber || '',
+              expiryDate: toDateInputValue(activeBatch.expiryDate),
+            };
+            changed = true;
+          }
+
+          if (!items[index]._batchLocked && (Number(items[index].quantity) || 0) > getBatchAvailableQty(activeBatch)) {
+            const splitResult = applyAutoSplitForLine(items, index);
+            if (splitResult.addedCount > 0) {
+              items = splitResult.items;
+              changed = true;
+              index += splitResult.addedCount;
+            }
+          }
+          continue;
         }
 
-        if (!item.batchNumber && fefoBatches.length > 0) {
-          const firstBatch = fefoBatches[0];
-          const baseBatchPrice = getBatchBaseUnitPrice(firstBatch);
-          changed = true;
-          return {
+        if (!item.batchNumber && firstAvailableBatch) {
+          const baseBatchPrice = getBatchBaseUnitPrice(firstAvailableBatch);
+          items[index] = {
             ...item,
-            batchRef: getBatchOptionValue(firstBatch),
-            batchNumber: firstBatch.batchNumber || '',
-            expiryDate: toDateInputValue(firstBatch.expiryDate),
+            batchRef: getBatchOptionValue(firstAvailableBatch),
+            batchNumber: firstAvailableBatch.batchNumber || '',
+            expiryDate: toDateInputValue(firstAvailableBatch.expiryDate),
             unitPrice: applyPriceRounding(
               calculateSellingPriceFromMargin(baseBatchPrice, item.margin),
               prev.priceRoundingStep,
             ),
           };
-        }
+          changed = true;
 
-        return item;
-      });
+          if ((Number(item.quantity) || 0) > getBatchAvailableQty(firstAvailableBatch)) {
+            const splitResult = applyAutoSplitForLine(items, index);
+            if (splitResult.addedCount > 0) {
+              items = splitResult.items;
+              index += splitResult.addedCount;
+            }
+          }
+        }
+      }
 
       return changed ? { ...prev, items } : prev;
     });
-  }, [stockMap]);
+  }, [applyAutoSplitForLine, stockMap]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -449,57 +695,84 @@ function SOFormModal({ order, onClose, onSaved }) {
   };
 
   const handleItemChange = (index, field, value) => {
-    setForm((p) => {
-      const items = [...p.items];
-      const nextItem = { ...items[index], [field]: value };
+    const items = [...form.items];
+    const nextItem = { ...items[index], [field]: value };
+    const productStock = stockMap[nextItem.productId];
+    const selectedBatch = findBatchByValue(productStock?.batches || [], nextItem.batchRef || nextItem.batchNumber);
 
-      if (field === 'margin') {
-        const productStock = stockMap[nextItem.productId];
-        const selectedBatch = findBatchByValue(productStock?.batches || [], nextItem.batchRef || nextItem.batchNumber);
-        if (selectedBatch) {
-          const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
-          nextItem.unitPrice = applyPriceRounding(
-            calculateSellingPriceFromMargin(baseBatchPrice, value),
-            p.priceRoundingStep,
-          );
-        }
+    if (field === 'margin') {
+      if (selectedBatch) {
+        const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
+        nextItem.unitPrice = applyPriceRounding(
+          calculateSellingPriceFromMargin(baseBatchPrice, value),
+          form.priceRoundingStep,
+        );
       }
+    }
 
-      items[index] = nextItem;
-      return { ...p, items };
-    });
+    if (field === 'unitPrice' && selectedBatch) {
+      const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
+      nextItem.margin = calculateMarginFromSellingPrice(baseBatchPrice, value);
+    }
+
+    items[index] = nextItem;
+
+    if (field === 'quantity' && (nextItem.batchRef || nextItem.batchNumber)) {
+      const splitResult = applyAutoSplitForLine(items, index);
+      setForm((p) => ({ ...p, items: splitResult.items }));
+
+      if (splitResult.addedCount > 0) {
+        toast.success('Qty melebihi stok batch terpilih. Batch lain ditambahkan otomatis.');
+      }
+      if (splitResult.hasRemainder) {
+        toast.error('Qty melebihi total stok semua batch yang tersedia. Sisa qty tidak ditambahkan.');
+      }
+      return;
+    }
+
+    setForm((p) => ({ ...p, items }));
   };
 
   const handleBatchSelect = (index, batchValue) => {
-    setForm((p) => {
-      const items = [...p.items];
-      const current = items[index];
-      const productStock = stockMap[current.productId];
-      const selectedBatch = findBatchByValue(productStock?.batches || [], batchValue);
+    const items = [...form.items];
+    const current = items[index];
+    const productStock = stockMap[current.productId];
+    const selectedBatch = findBatchByValue(productStock?.batches || [], batchValue);
 
-      if (!selectedBatch) {
-        items[index] = {
-          ...current,
-          batchRef: batchValue,
-          batchNumber: '',
-          expiryDate: '',
-        };
-        return { ...p, items };
-      }
-
-      const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
+    if (!selectedBatch) {
       items[index] = {
         ...current,
-        batchRef: getBatchOptionValue(selectedBatch),
-        batchNumber: selectedBatch.batchNumber || '',
-        expiryDate: toDateInputValue(selectedBatch.expiryDate),
-        unitPrice: applyPriceRounding(
-          calculateSellingPriceFromMargin(baseBatchPrice, current.margin),
-          p.priceRoundingStep,
-        ),
+        batchRef: batchValue,
+        batchNumber: '',
+        expiryDate: '',
+        _batchLocked: false,
       };
-      return { ...p, items };
-    });
+      setForm((p) => ({ ...p, items }));
+      return;
+    }
+
+    const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
+    items[index] = {
+      ...current,
+      batchRef: getBatchOptionValue(selectedBatch),
+      batchNumber: selectedBatch.batchNumber || '',
+      expiryDate: toDateInputValue(selectedBatch.expiryDate),
+      unitPrice: applyPriceRounding(
+        calculateSellingPriceFromMargin(baseBatchPrice, current.margin),
+        form.priceRoundingStep,
+      ),
+      _batchLocked: false,
+    };
+
+    const splitResult = applyAutoSplitForLine(items, index);
+    setForm((p) => ({ ...p, items: splitResult.items }));
+
+    if (splitResult.addedCount > 0) {
+      toast.success('Qty melebihi stok batch terpilih. Batch lain ditambahkan otomatis.');
+    }
+    if (splitResult.hasRemainder) {
+      toast.error('Qty melebihi total stok semua batch yang tersedia. Sisa qty tidak ditambahkan.');
+    }
   };
 
   const roundItemUnitPrice = (index) => {
@@ -557,10 +830,6 @@ function SOFormModal({ order, onClose, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.invoiceNumber.trim()) {
-      toast.error('Nomor SO/Invoice wajib diisi');
-      return;
-    }
     if (!form.customerId) {
       toast.error('Pelanggan wajib dipilih');
       return;
@@ -573,9 +842,9 @@ function SOFormModal({ order, onClose, onSaved }) {
     setLoading(true);
     try {
       const payload = {
-        invoiceNumber: form.invoiceNumber.trim(),
         customerId: form.customerId,
         orderDate: form.orderDate,
+        deliveryDate: form.expectedDeliveryDate || undefined,
         expectedDeliveryDate: form.expectedDeliveryDate || undefined,
         paymentTermDays: Number(form.paymentTermDays),
         shippingAddress: form.shippingAddress || undefined,
@@ -624,17 +893,6 @@ function SOFormModal({ order, onClose, onSaved }) {
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Info Umum */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor SO/Invoice *</label>
-              <input
-                name="invoiceNumber"
-                value={form.invoiceNumber}
-                onChange={handleChange}
-                placeholder="SO-2026-0001"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-              />
-              <p className="text-xs text-gray-400 mt-1">Harus unik sesuai kontrak API</p>
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Pelanggan *</label>
               <AutocompleteInput
@@ -748,7 +1006,7 @@ function SOFormModal({ order, onClose, onSaved }) {
             </div>
             <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3 mb-3">
               <p className="text-xs text-cyan-800">
-                SO ini berfungsi sebagai dokumen pengiriman utama. Saat disimpan, status awal mengikuti flow backend (draft), lalu diproses ke packed dan delivered sesuai alur operasional.
+                Sales Order ini berfungsi sebagai dokumen pengiriman utama. Invoice dibuat terpisah melalui proses generate invoice, dan satu invoice dapat mencakup beberapa surat jalan.
               </p>
             </div>
             <div className="mb-3">
@@ -778,50 +1036,65 @@ function SOFormModal({ order, onClose, onSaved }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {form.items.map((item, idx) => (
+                    {form.items.map((item, idx) => {
+                      const availableBatchOptions = getSelectableBatchesForItem(form.items, idx, stockMap[item.productId]?.batches || []);
+
+                      return (
                       <React.Fragment key={idx}>
-                        <tr>
+                        <tr className={item._splitFrom ? 'bg-gray-50/40' : ''}>
                           <td className="px-4 py-2.5 text-gray-400 align-top">{idx + 1}</td>
                           <td className="px-4 py-2.5 align-top">
-                            <AutocompleteInput
-                              value={item.productName}
-                              onChange={(text) => handleItemChange(idx, 'productName', text)}
-                              onSelect={(prod) => {
-                                const items = [...form.items];
-                                items[idx] = {
-                                  ...items[idx],
-                                  productId: prod._id,
-                                  productName: prod.name,
-                                  sku: prod.sku || '',
-                                  satuan: prod.satuan || items[idx].satuan,
-                                  batchRef: '',
-                                  batchNumber: '',
-                                  expiryDate: '',
-                                  unitPrice: 0,
-                                };
-                                setForm((p) => ({ ...p, items }));
-                                fetchProductStock(prod._id);
-                              }}
-                              onClear={() => {
-                                handleItemChange(idx, 'productId', '');
-                                handleItemChange(idx, 'productName', '');
-                                handleItemChange(idx, 'sku', '');
-                                handleItemChange(idx, 'batchRef', '');
-                                handleItemChange(idx, 'batchNumber', '');
-                                handleItemChange(idx, 'expiryDate', '');
-                                handleItemChange(idx, 'unitPrice', 0);
-                              }}
-                              fetchFn={(params) => productService.getAll({ ...params, isActive: true })}
-                              getDisplayText={(prod) => prod.name}
-                              renderItem={(prod) => (
-                                <div>
-                                  <p className="font-medium text-gray-800">{prod.name}</p>
-                                  <p className="text-xs text-gray-400">{prod.sku || '-'} &middot; {prod.satuan || '-'}</p>
-                                </div>
-                              )}
-                              placeholder="Cari produk..."
-                              inputClassName="!rounded-lg !py-2"
-                            />
+                            {item._splitFrom ? (
+                              <div className="pt-2">
+                                <p className="text-xs text-gray-500 italic">↳ batch lanjutan</p>
+                                <p className="font-medium text-gray-900">{item.productName || '-'}</p>
+                              </div>
+                            ) : (
+                              <AutocompleteInput
+                                disabled={Boolean(item._splitFrom)}
+                                value={item.productName}
+                                onChange={(text) => handleItemChange(idx, 'productName', text)}
+                                onSelect={(prod) => {
+                                  const items = [...form.items];
+                                  items[idx] = {
+                                    ...items[idx],
+                                    productId: prod._id,
+                                    productName: prod.name,
+                                    sku: prod.sku || '',
+                                    satuan: prod.satuan || items[idx].satuan,
+                                    batchRef: '',
+                                    batchNumber: '',
+                                    expiryDate: '',
+                                    unitPrice: 0,
+                                    _splitFrom: '',
+                                    _batchLocked: false,
+                                  };
+                                  setForm((p) => ({ ...p, items }));
+                                  fetchProductStock(prod._id);
+                                }}
+                                onClear={() => {
+                                  setForm((p) => {
+                                    const items = [...p.items];
+                                    items[idx] = {
+                                      ...emptyItem(),
+                                      _splitFrom: '',
+                                      _batchLocked: false,
+                                    };
+                                    return { ...p, items };
+                                  });
+                                }}
+                                fetchFn={(params) => productService.getAll({ ...params, isActive: true })}
+                                getDisplayText={(prod) => prod.name}
+                                renderItem={(prod) => (
+                                  <div>
+                                    <p className="font-medium text-gray-800">{prod.name}</p>
+                                    <p className="text-xs text-gray-400">{prod.sku || '-'} &middot; {prod.satuan || '-'}</p>
+                                  </div>
+                                )}
+                                placeholder="Cari produk..."
+                                inputClassName="!rounded-lg !py-2"
+                              />
+                            )}
                             {item.sku && <p className="text-xs text-gray-400 mt-0.5">{item.sku}</p>}
                             {item.productId && stockMap[item.productId] && (
                               <div className="mt-1">
@@ -850,6 +1123,7 @@ function SOFormModal({ order, onClose, onSaved }) {
                             <input
                               value={item.satuan}
                               onChange={(e) => handleItemChange(idx, 'satuan', e.target.value)}
+                              disabled={Boolean(item._splitFrom)}
                               className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                             />
                           </td>
@@ -915,21 +1189,24 @@ function SOFormModal({ order, onClose, onSaved }) {
                               value={item.batchRef || item.batchNumber || ''}
                               onChange={(e) => handleBatchSelect(idx, e.target.value)}
                               className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
-                              disabled={!item.productId || !stockMap[item.productId]?.batches?.length}
+                              disabled={item._batchLocked || !item.productId || availableBatchOptions.length === 0}
                             >
                               <option value="">
                                 {!item.productId
                                   ? 'Pilih produk dulu'
-                                  : stockMap[item.productId]?.batches?.length
+                                  : availableBatchOptions.length
                                     ? 'Pilih batch (FEFO disarankan paling atas)'
                                     : 'Batch tidak tersedia'}
                               </option>
-                              {getFefoSortedBatches(stockMap[item.productId]?.batches || []).map((batch) => (
+                              {availableBatchOptions.map((batch) => (
                                 <option key={getBatchOptionValue(batch)} value={getBatchOptionValue(batch)}>
                                   {batch.batchNumber || '-'} | ED {formatDate(batch.expiryDate)} | Stok {getBatchAvailableQty(batch).toLocaleString('id-ID')} | Modal {formatCurrency(getBatchBaseUnitPrice(batch))}
                                 </option>
                               ))}
                             </select>
+                            {item._batchLocked && (
+                              <p className="text-[10px] text-gray-400 mt-1">Batch terkunci karena stok batch sebelumnya sudah dialokasikan otomatis.</p>
+                            )}
                           </td>
                           <td className="px-4 py-2" colSpan={4}>
                             <label className="block text-[11px] font-medium text-gray-500 mb-1">Exp. Date</label>
@@ -942,7 +1219,8 @@ function SOFormModal({ order, onClose, onSaved }) {
                           </td>
                         </tr>
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200 bg-gray-50/50">
@@ -950,13 +1228,11 @@ function SOFormModal({ order, onClose, onSaved }) {
                       <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(subtotal)}</td>
                       <td></td>
                     </tr>
-                    {isPkp && (
-                      <tr className="bg-gray-50/50">
-                        <td colSpan={7} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({ppnRate}%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
-                        <td></td>
-                      </tr>
-                    )}
+                    <tr className="bg-gray-50/50">
+                      <td colSpan={7} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({isPkp ? ppnRate : 0}%)</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
+                      <td></td>
+                    </tr>
                     <tr className="border-t border-gray-300 bg-gray-50/50">
                       <td colSpan={7} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">{formatCurrency(grandTotal)}</td>
@@ -976,7 +1252,7 @@ function SOFormModal({ order, onClose, onSaved }) {
                 <p className="text-sm font-medium text-blue-800">Ketentuan SO Pengiriman</p>
                 <p className="text-xs text-blue-700 mt-1">
                   Karena modul Delivery terpisah sudah ditiadakan, Sales Order ini menjadi sumber utama alur pengiriman.
-                  Perubahan status ke delivered akan memicu proses lanjutan ke modul finance sesuai business rules backend.
+                  Perubahan status ke generate invoice dan menunggu pembayaran akan memicu proses lanjutan ke modul finance sesuai business rules backend.
                 </p>
               </div>
             </div>
@@ -1014,7 +1290,7 @@ function SOFormModal({ order, onClose, onSaved }) {
    ═══════════════════════════════════════ */
 function SODetailModal({ order, onClose }) {
   const normalizedStatus = normalizeSOStatus(order.status);
-  const st = STATUS_MAP[normalizedStatus] || STATUS_MAP.packed;
+  const st = STATUS_MAP[normalizedStatus] || STATUS_MAP.shipped;
   const { isPkp, ppnRate, calculatePpn } = useSettings();
 
   const subtotal = (order.items || []).reduce((sum, item) => {
@@ -1037,7 +1313,7 @@ function SODetailModal({ order, onClose }) {
                 <Truck size={18} />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{getOrderInvoiceNumber(order)}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{getOrderSuratJalanNumber(order)}</h2>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${st.color}`}>
                     <st.icon size={10} />
@@ -1068,15 +1344,18 @@ function SODetailModal({ order, onClose }) {
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Informasi Pengiriman</p>
               <div className="space-y-1 text-sm">
                 <p className="text-gray-600">Term: <span className="font-medium text-gray-800">{order.paymentTermDays ?? 30} hari</span></p>
-                <p className="text-gray-600">Nomor SO/Invoice: <span className="font-medium text-gray-800">{getOrderInvoiceNumber(order)}</span></p>
+                <p className="text-gray-600">No Surat Jalan: <span className="font-medium text-gray-800">{getOrderSuratJalanNumber(order)}</span></p>
                 {order.expectedDeliveryDate && (
                   <p className="text-gray-600">Estimasi kirim: <span className="font-medium text-gray-800">{formatDate(order.expectedDeliveryDate)}</span></p>
                 )}
-                {order.packedAt && (
-                  <p className="text-gray-600">Packed at: <span className="font-medium text-gray-800">{formatDate(order.packedAt)}</span></p>
+                {order.deliveryDate && (
+                  <p className="text-gray-600">Tanggal kirim: <span className="font-medium text-gray-800">{formatDate(order.deliveryDate)}</span></p>
                 )}
-                {order.deliveredAt && (
-                  <p className="text-gray-600">Delivered at: <span className="font-medium text-gray-800">{formatDate(order.deliveredAt)}</span></p>
+                {order.shippedAt && (
+                  <p className="text-gray-600">Shipped at: <span className="font-medium text-gray-800">{formatDate(order.shippedAt)}</span></p>
+                )}
+                {order.invoicedAt && (
+                  <p className="text-gray-600">Invoiced at: <span className="font-medium text-gray-800">{formatDate(order.invoicedAt)}</span></p>
                 )}
               </div>
             </div>
@@ -1098,11 +1377,11 @@ function SODetailModal({ order, onClose }) {
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Riwayat Status</h3>
               <div className="space-y-2">
                 {order.statusHistory.map((h, i) => {
-                  const hst = STATUS_MAP[normalizeSOStatus(h.status)] || STATUS_MAP.packed;
-                  const statusDotClass = ['delivered', 'completed'].includes(normalizeSOStatus(h.status))
+                  const hst = STATUS_MAP[normalizeSOStatus(h.status)] || STATUS_MAP.shipped;
+                  const statusDotClass = ['completed'].includes(normalizeSOStatus(h.status))
                     ? 'bg-emerald-500'
-                    : ['partial_delivered'].includes(normalizeSOStatus(h.status))
-                      ? 'bg-purple-500'
+                    : ['awaiting_payment'].includes(normalizeSOStatus(h.status))
+                      ? 'bg-amber-500'
                     : ['returned', 'canceled', 'cancelled'].includes(normalizeSOStatus(h.status))
                       ? 'bg-red-500'
                       : 'bg-blue-500';
@@ -1172,12 +1451,10 @@ function SODetailModal({ order, onClose }) {
                     <td colSpan={8} className="px-4 py-2.5 text-right text-sm text-gray-600">Subtotal</td>
                     <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(subtotal)}</td>
                   </tr>
-                  {isPkp && (
-                    <tr className="bg-gray-50/50">
-                      <td colSpan={8} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({ppnRate}%)</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
-                    </tr>
-                  )}
+                  <tr className="bg-gray-50/50">
+                    <td colSpan={8} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({isPkp ? ppnRate : 0}%)</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
+                  </tr>
                   <tr className="border-t border-gray-300 bg-gray-50/50">
                     <td colSpan={8} className="px-4 py-3 text-right font-semibold text-gray-700">Total</td>
                     <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(total)}</td>
@@ -1227,7 +1504,7 @@ function DeleteConfirmModal({ order, onClose, onConfirm }) {
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Hapus Sales Order?</h3>
         <p className="text-sm text-gray-500 mb-6">
-          SO <strong>{getOrderInvoiceNumber(order)}</strong> akan dihapus. Tindakan ini tidak dapat dibatalkan.
+          Surat Jalan <strong>{getOrderSuratJalanNumber(order)}</strong> akan dihapus. Tindakan ini tidak dapat dibatalkan.
         </p>
         <div className="flex items-center justify-center gap-3">
           <button
@@ -1295,7 +1572,7 @@ function emptyItem() {
     batchNumber: '',
     expiryDate: '',
     unitPrice: 0,
-    margin: 0,
+    margin: 20,
     discount: 0,
     notes: '',
   };
@@ -1319,6 +1596,13 @@ function calculateSellingPriceFromMargin(basePrice, marginPercent) {
   return Math.max(0, base * (1 + (margin / 100)));
 }
 
+function calculateMarginFromSellingPrice(basePrice, sellingPrice) {
+  const base = Number(basePrice || 0);
+  const selling = Number(sellingPrice || 0);
+  if (base <= 0) return 0;
+  return Number((((selling - base) / base) * 100).toFixed(2));
+}
+
 function applyPriceRounding(price, step) {
   const value = Number(price || 0);
   const roundingStep = Number(step || 0);
@@ -1340,6 +1624,33 @@ function findBatchByValue(batches, value) {
   return (batches || []).find((b) => (
     String(b?._id || '') === key || String(b?.batchNumber || '') === key
   )) || null;
+}
+
+function getSelectableBatchesForItem(items, index, batches) {
+  const currentItem = items[index];
+  if (!currentItem?.productId) return [];
+
+  const currentValue = String(currentItem.batchRef || currentItem.batchNumber || '');
+  const usedBySiblings = new Set(
+    (items || [])
+      .filter((entry, entryIndex) => entryIndex !== index && entry.productId === currentItem.productId)
+      .map((entry) => String(entry.batchRef || entry.batchNumber || ''))
+      .filter(Boolean),
+  );
+
+  return getFefoSortedBatches(batches).filter((batch) => {
+    const optionValue = String(getBatchOptionValue(batch));
+    const batchNumber = String(batch?.batchNumber || '');
+    const availableQty = getBatchAvailableQty(batch);
+
+    if (currentValue && (currentValue === optionValue || currentValue === batchNumber)) {
+      return true;
+    }
+
+    if (availableQty <= 0) return false;
+
+    return !usedBySiblings.has(optionValue) && !usedBySiblings.has(batchNumber);
+  });
 }
 
 function toDateInputValue(dateStr) {
@@ -1370,16 +1681,26 @@ function normalizeSOStatus(status) {
   const normalized = String(status || '').toLowerCase();
   const map = {
     draft: 'draft',
-    confirmed: 'packed',
-    processing: 'packed',
-    ready_to_ship: 'packed',
-    partial_shipped: 'partial_delivered',
-    partial_delivery: 'partial_delivered',
-    partial_delivered: 'partial_delivered',
-    shipped: 'delivered',
+    confirmed: 'shipped',
+    processing: 'shipped',
+    ready_to_ship: 'shipped',
+    packed: 'shipped',
+    partial_shipped: 'shipped',
+    delivered: 'awaiting_payment',
+    partial_delivery: 'awaiting_payment',
+    partial_delivered: 'awaiting_payment',
+    invoiced: 'awaiting_payment',
+    shipped: 'shipped',
+    waiting_payment: 'awaiting_payment',
+    pending_payment: 'awaiting_payment',
+    awaiting_payment: 'awaiting_payment',
+    paid: 'completed',
+    lunas: 'completed',
     done: 'completed',
     completed: 'completed',
-    cancelled: 'canceled',
+    returned: 'returned',
+    canceled: 'returned',
+    cancelled: 'returned',
   };
   return map[normalized] || normalized || 'draft';
 }
@@ -1388,21 +1709,14 @@ function getAllowedStatusTransitions(status) {
   const current = normalizeSOStatus(status);
   const transitions = {
     draft: [
-      { value: 'packed', label: 'Dikemas' },
-      { value: 'canceled', label: 'Dibatalkan' },
+      { value: 'shipped', label: 'Dikirim' },
     ],
-    packed: [
-      { value: 'delivered', label: 'Terkirim' },
-    ],
-    delivered: [
-      { value: 'partial_delivered', label: 'Terkirim Sebagian' },
+    shipped: [
       { value: 'returned', label: 'Diretur' },
-      { value: 'completed', label: 'Selesai' },
     ],
-    partial_delivered: [
-      { value: 'delivered', label: 'Terkirim Penuh' },
-      { value: 'returned', label: 'Diretur' },
+    awaiting_payment: [
       { value: 'completed', label: 'Selesai' },
+      { value: 'returned', label: 'Diretur' },
     ],
     completed: [],
     returned: [],
@@ -1411,6 +1725,13 @@ function getAllowedStatusTransitions(status) {
   return transitions[current] || [];
 }
 
-function getOrderInvoiceNumber(order) {
-  return order?.invoiceNumber || order?.soNumber || order?.fakturNumber || order?.noFaktur || '-';
+function getOrderSuratJalanNumber(order) {
+  return order?.suratJalanNumber
+    || order?.noSuratJalan
+    || order?.deliveryNoteNumber
+    || order?.invoiceNumber
+    || order?.soNumber
+    || order?.fakturNumber
+    || order?.noFaktur
+    || '-';
 }

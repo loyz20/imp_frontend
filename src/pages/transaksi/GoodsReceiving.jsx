@@ -4,14 +4,15 @@ import useAuthStore from '../../store/authStore';
 import Pagination from '../../components/Pagination';
 import AutocompleteInput from '../../components/AutocompleteInput';
 import goodsReceivingService from '../../services/goodsReceivingService';
+import purchaseOrderService from '../../services/purchaseOrderService';
 import productService from '../../services/productService';
 import supplierService from '../../services/supplierService';
+import useSettings from '../../hooks/useSettings';
 import toast from 'react-hot-toast';
 import {
   Plus, Eye, SquarePen, Trash2, X, Check, AlertTriangle,
   Package, FileText, Calendar, Loader2, CheckCircle, Clock,
   ClipboardCheck, TruckIcon, Boxes, ShieldCheck, FlaskConical,
-  ThermometerSun,
 } from 'lucide-react';
 
 /* ── Constants ── */
@@ -174,7 +175,6 @@ export default function GoodsReceiving() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. Penerimaan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">No. PO</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Supplier</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Terima</th>
@@ -186,14 +186,14 @@ export default function GoodsReceiving() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
+                  <td colSpan={6} className="px-5 py-12 text-center">
                     <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
                     <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                   </td>
                 </tr>
               ) : receivings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
+                  <td colSpan={6} className="px-5 py-12 text-center">
                     <Package className="w-10 h-10 text-gray-300 mx-auto" />
                     <p className="text-sm text-gray-400 mt-2">Tidak ada penerimaan barang ditemukan.</p>
                   </td>
@@ -203,12 +203,6 @@ export default function GoodsReceiving() {
                   const st = STATUS_MAP[rec.status] || STATUS_MAP.draft;
                   return (
                     <tr key={oid(rec)} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <p className="font-medium text-gray-900">{getReceivingDisplayNumber(rec)}</p>
-                        {rec.deliveryNote && (
-                          <p className="text-xs text-gray-400 truncate max-w-45">SJ: {rec.deliveryNote}</p>
-                        )}
-                      </td>
                       <td className="px-5 py-3.5 hidden md:table-cell">
                         <span className="text-blue-600 font-medium">{resolveRef(rec, 'purchaseOrder', 'purchaseOrderId')?.poNumber || '-'}</span>
                       </td>
@@ -307,8 +301,10 @@ export default function GoodsReceiving() {
    ═══════════════════════════════════════ */
 function GRFormModal({ receiving, onClose, onSaved }) {
   const { createReceiving, updateReceiving } = useGoodsReceivingStore();
+  const { ppnRate: defaultPpnRate, isPkp } = useSettings();
   const isEdit = !!receiving;
   const [loading, setLoading] = useState(false);
+  const hasExistingPpn = Number(receiving?.ppnAmount || 0) > 0 || Number(receiving?.ppnRate || 0) > 0;
 
   const [form, setForm] = useState({
     purchaseOrderId: resolveIdStr(receiving, 'purchaseOrder', 'purchaseOrderId'),
@@ -316,9 +312,10 @@ function GRFormModal({ receiving, onClose, onSaved }) {
     supplierId: resolveIdStr(receiving, 'supplier', 'supplierId') || resolveIdStr(receiving?.purchaseOrder, 'supplier', 'supplierId'),
     supplierName: resolveRef(receiving, 'supplier', 'supplierId')?.name || resolveRef(receiving?.purchaseOrder, 'supplier', 'supplierId')?.name || '',
     receivingDate: receiving?.receivingDate ? receiving.receivingDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
-    deliveryNote: receiving?.deliveryNote || '',
     invoiceNumber: receiving?.invoiceNumber || '',
     notes: receiving?.notes || '',
+    enablePpn: hasExistingPpn || !!isPkp,
+    ppnRate: receiving?.ppnRate ?? defaultPpnRate ?? 11,
     items: receiving?.items?.length
       ? receiving.items.map((item) => ({
           productId: resolveIdStr(item, 'product', 'productId'),
@@ -327,19 +324,29 @@ function GRFormModal({ receiving, onClose, onSaved }) {
           satuan: item.satuan || 'Box',
           orderedQty: item.orderedQty || 0,
           receivedQty: item.receivedQty || 0,
+          discount: Number(item.discount ?? 0),
           batchNumber: item.batchNumber || '',
           expiryDate: item.expiryDate ? item.expiryDate.slice(0, 10) : '',
-          manufacturingDate: item.manufacturingDate ? item.manufacturingDate.slice(0, 10) : '',
-          storageCondition: item.storageCondition || 'Suhu Kamar',
-          conditionStatus: item.conditionStatus || 'baik',
           notes: item.notes || '',
           price: Number(item.unitprice ?? item.unitPrice ?? item.price ?? 0),
         }))
       : [{ ...emptyGRItem(), price: 0 }],
   });
+
+  const calculateItemSubtotal = (item) => {
+    const qty = Number(item?.receivedQty || 0);
+    const price = Number(item?.price || 0);
+    const discount = Number(item?.discount || 0);
+    const raw = qty * price;
+    return raw - (raw * discount / 100);
+  };
+
   // Calculate subtotal and total
-  const subtotal = form.items.reduce((sum, i) => sum + (Number(i.price || 0) * Number(i.receivedQty || 0)), 0);
-  const total = subtotal;
+  const subtotal = form.items.reduce((sum, i) => sum + calculateItemSubtotal(i), 0);
+  const ppnAmount = form.enablePpn
+    ? Math.round(subtotal * Number(form.ppnRate || 0) / 100)
+    : 0;
+  const grandTotal = subtotal + ppnAmount;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -397,19 +404,21 @@ function GRFormModal({ receiving, onClose, onSaved }) {
         purchaseOrderId: form.purchaseOrderId || undefined,
         supplierId: form.supplierId,
         receivingDate: form.receivingDate,
-        deliveryNote: form.deliveryNote,
         invoiceNumber: form.invoiceNumber.trim(),
         notes: form.notes,
+        enablePpn: !!form.enablePpn,
+        ppnRate: form.enablePpn ? Number(form.ppnRate || 0) : 0,
+        ppnAmount,
+        subtotal,
+        totalAmount: grandTotal,
         items: validItems.map((i) => ({
           productId: i.productId,
           satuan: i.satuan,
           orderedQty: Number(i.orderedQty),
           receivedQty: Number(i.receivedQty),
+          discount: Number(i.discount || 0),
           batchNumber: i.batchNumber,
           expiryDate: i.expiryDate,
-          manufacturingDate: i.manufacturingDate || undefined,
-          storageCondition: i.storageCondition,
-          conditionStatus: i.conditionStatus,
           notes: i.notes,
           unitPrice: i.price || 0,
         })),
@@ -452,36 +461,31 @@ function GRFormModal({ receiving, onClose, onSaved }) {
               <AutocompleteInput
                 value={form.poNumber}
                 onChange={(text) => setForm((p) => ({ ...p, poNumber: text }))}
-                onSelect={(po) => {
-                  const supplier = po.supplier || po.supplierId;
-                  const supplierName = typeof supplier === 'object' ? supplier?.name : form.supplierName;
-                  const supplierId = typeof supplier === 'object' ? supplier?._id : form.supplierId;
+                onSelect={async (po) => {
+                  let resolvedPO = po;
+                  try {
+                    const poId = po?._id || po?.id;
+                    if (poId) {
+                      const { data } = await purchaseOrderService.getById(poId);
+                      resolvedPO = data?.data || po;
+                    }
+                  } catch {
+                    // Fallback to available PO payload if detail endpoint fails.
+                  }
+
                   setForm((p) => ({
                     ...p,
-                    purchaseOrderId: po._id,
-                    poNumber: po.poNumber,
-                    supplierId,
-                    supplierName,
-                    items: po.items?.length
-                      ? po.items.map((item) => {
-                          const prod = item.product || item.productId;
-                          return {
-                            productId: typeof prod === 'object' ? prod?._id : prod || '',
-                            productName: typeof prod === 'object' ? prod?.name : item.productName || '',
-                            sku: typeof prod === 'object' ? prod?.sku : item.sku || '',
-                            satuan: item.satuan || 'Box',
-                            orderedQty: item.quantity || item.orderedQty || item.remainingQty || 0,
-                            receivedQty: 0,
-                            batchNumber: '',
-                            expiryDate: '',
-                            manufacturingDate: '',
-                            storageCondition: 'Suhu Kamar',
-                            conditionStatus: 'baik',
-                            notes: '',
-                            price: getNetUnitPriceFromPOItem(item),
-                          };
-                        })
-                      : p.items,
+                    purchaseOrderId: resolvedPO?._id || resolvedPO?.id || po?._id || po?.id || '',
+                    poNumber: resolvedPO?.poNumber || po?.poNumber || '',
+                    supplierId:
+                      (typeof (resolvedPO?.supplier || resolvedPO?.supplierId) === 'object'
+                        ? (resolvedPO?.supplier || resolvedPO?.supplierId)?._id
+                        : '') || p.supplierId,
+                    supplierName:
+                      (typeof (resolvedPO?.supplier || resolvedPO?.supplierId) === 'object'
+                        ? (resolvedPO?.supplier || resolvedPO?.supplierId)?.name
+                        : '') || resolvedPO?.supplierName || p.supplierName,
+                    items: mapPOItemsToGRItems(resolvedPO?.items, p.items),
                   }));
                 }}
                 onClear={() => setForm((p) => ({ ...p, purchaseOrderId: '', poNumber: '' }))}
@@ -548,16 +552,6 @@ function GRFormModal({ receiving, onClose, onSaved }) {
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">No. Surat Jalan</label>
-              <input
-                name="deliveryNote"
-                value={form.deliveryNote}
-                onChange={handleChange}
-                placeholder="Nomor surat jalan supplier"
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-              />
-            </div>
           </div>
 
           {/* Items */}
@@ -589,7 +583,7 @@ function GRFormModal({ receiving, onClose, onSaved }) {
                     )}
                   </div>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-3 items-end">
                       {/* Produk */}
                       <div className="col-span-2">
                         <label className="text-xs font-medium text-gray-600 mb-1 block">Produk</label>
@@ -667,12 +661,24 @@ function GRFormModal({ receiving, onClose, onSaved }) {
                           placeholder="Harga"
                         />
                       </div>
+                      {/* Diskon */}
+                      <div>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Diskon (%)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={item.discount}
+                          onChange={(e) => handleItemChange(idx, 'discount', Number(e.target.value))}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                        />
+                      </div>
                       {/* Subtotal */}
                       <div>
                         <label className="text-xs font-medium text-gray-600 mb-1 block">Subtotal</label>
                         <input
                           type="text"
-                          value={formatCurrency((item.price || 0) * (item.receivedQty || 0))}
+                          value={formatCurrency(calculateItemSubtotal(item))}
                           readOnly
                           className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-right"
                           tabIndex={-1}
@@ -680,7 +686,7 @@ function GRFormModal({ receiving, onClose, onSaved }) {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                       {/* Batch */}
                       <div>
                         <label className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
@@ -705,45 +711,6 @@ function GRFormModal({ receiving, onClose, onSaved }) {
                           className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                         />
                       </div>
-                      {/* Manufacturing Date */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Tgl Produksi</label>
-                        <input
-                          type="date"
-                          value={item.manufacturingDate}
-                          onChange={(e) => handleItemChange(idx, 'manufacturingDate', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                        />
-                      </div>
-                      {/* Storage Condition */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
-                          <ThermometerSun size={12} /> Penyimpanan
-                        </label>
-                        <select
-                          value={item.storageCondition}
-                          onChange={(e) => handleItemChange(idx, 'storageCondition', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
-                        >
-                          <option value="Suhu Kamar">Suhu Kamar (25-30°C)</option>
-                          <option value="Sejuk">Sejuk (15-25°C)</option>
-                          <option value="Dingin">Dingin (2-8°C)</option>
-                          <option value="Beku">Beku (≤0°C)</option>
-                        </select>
-                      </div>
-                      {/* Condition Status */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Kondisi</label>
-                        <select
-                          value={item.conditionStatus}
-                          onChange={(e) => handleItemChange(idx, 'conditionStatus', e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
-                        >
-                          <option value="baik">Baik</option>
-                          <option value="rusak">Rusak</option>
-                          <option value="cacat">Cacat Kemasan</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
                   {/* Qty mismatch warning */}
@@ -765,19 +732,73 @@ function GRFormModal({ receiving, onClose, onSaved }) {
               <div>
                 <p className="text-sm font-medium text-emerald-800">Kepatuhan CDOB</p>
                 <p className="text-xs text-emerald-700 mt-1">
-                  Setiap item wajib memiliki nomor batch dan tanggal kedaluwarsa. Pastikan kondisi penyimpanan
-                  sesuai persyaratan produk. Sistem menggunakan FEFO (First Expired First Out) untuk manajemen stok.
+                  Setiap item wajib memiliki nomor batch dan tanggal kedaluwarsa.
+                  Sistem menggunakan FEFO (First Expired First Out) untuk manajemen stok.
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">PPN (Opsional)</p>
+                <p className="text-xs text-gray-500 mt-0.5">Aktifkan jika penerimaan menggunakan PPN.</p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!!form.enablePpn}
+                  onChange={(e) => setForm((p) => ({ ...p, enablePpn: e.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                Gunakan PPN
+              </label>
+            </div>
+
+            {form.enablePpn && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Tarif PPN (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.ppnRate}
+                    onChange={(e) => setForm((p) => ({ ...p, ppnRate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </form>
 
         {/* Footer with Total Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-t border-gray-200">
-          <div className="w-full sm:w-auto max-w-xs bg-gray-50 border border-gray-200 rounded-xl p-4">
-              <span className="text-sm font-medium text-gray-700">Total </span>
-              <span className="text-lg font-bold text-emerald-700">{formatCurrency(total)}</span>
+          <div className="w-full sm:w-auto sm:min-w-75 bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+            {form.enablePpn ? (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">Total</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">PPN ({Number(form.ppnRate || 0)}%)</span>
+                  <span className="font-semibold text-gray-900">{formatCurrency(ppnAmount)}</span>
+                </div>
+                <div className="border-t border-gray-200 pt-2 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-800">Grand Total</span>
+                  <span className="text-lg font-bold text-emerald-700">{formatCurrency(grandTotal)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-800">Grand Total</span>
+                <span className="text-lg font-bold text-emerald-700">{formatCurrency(grandTotal)}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-end gap-2 flex-1">
             <button
@@ -810,6 +831,17 @@ function GRFormModal({ receiving, onClose, onSaved }) {
    ═══════════════════════════════════════ */
 function GRDetailModal({ receiving, onClose }) {
   const st = STATUS_MAP[receiving.status] || STATUS_MAP.draft;
+  const computedSubtotal = (receiving.items || []).reduce((sum, item) => {
+    const qty = Number(item?.receivedQty || 0);
+    const price = Number(item?.unitPrice ?? item?.unitprice ?? item?.price ?? 0);
+    const discount = Number(item?.discount || 0);
+    const raw = qty * price;
+    return sum + (raw - (raw * discount / 100));
+  }, 0);
+  const subtotal = Number(receiving?.subtotal ?? computedSubtotal);
+  const ppnAmount = Number(receiving?.ppnAmount || 0);
+  const ppnRate = Number(receiving?.ppnRate || 0);
+  const grandTotal = Number(receiving?.totalAmount ?? (subtotal + ppnAmount));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -842,7 +874,7 @@ function GRDetailModal({ receiving, onClose }) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Referensi PO</p>
               <p className="text-sm font-medium text-blue-600">{resolveRef(receiving, 'purchaseOrder', 'purchaseOrderId')?.poNumber || '-'}</p>
@@ -850,10 +882,6 @@ function GRDetailModal({ receiving, onClose }) {
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Supplier</p>
               <p className="text-sm font-medium text-gray-900">{resolveRef(receiving, 'supplier', 'supplierId')?.name || resolveRef(receiving?.purchaseOrder, 'supplier', 'supplierId')?.name || '-'}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">No. Surat Jalan</p>
-              <p className="text-sm font-medium text-gray-900">{receiving.deliveryNote || '-'}</p>
             </div>
           </div>
 
@@ -903,10 +931,6 @@ function GRDetailModal({ receiving, onClose }) {
                           <span className="ml-1 font-medium text-gray-800">{formatDate(item.manufacturingDate)}</span>
                         </div>
                       )}
-                      <div>
-                        <span className="text-gray-400">Penyimpanan:</span>
-                        <span className="ml-1 font-medium text-gray-800">{item.storageCondition || '-'}</span>
-                      </div>
                     </div>
                     {item.notes && (
                       <p className="text-xs text-gray-500 mt-2 italic">{item.notes}</p>
@@ -930,6 +954,25 @@ function GRDetailModal({ receiving, onClose }) {
               <p className="text-sm text-gray-700">{receiving.notes}</p>
             </div>
           )}
+
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:ml-auto sm:max-w-sm">
+            {subtotal > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-gray-700">Total</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
+              </div>
+            )}
+            {ppnAmount > 0 && (
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span className="font-medium text-gray-700">PPN{ppnRate > 0 ? ` (${ppnRate}%)` : ''}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(ppnAmount)}</span>
+              </div>
+            )}
+            <div className="border-t border-gray-200 mt-2 pt-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-800">Grand Total</span>
+              <span className="text-base font-bold text-emerald-700">{formatCurrency(grandTotal)}</span>
+            </div>
+          </div>
 
           {/* Metadata */}
           <div className="text-xs text-gray-400 space-y-0.5 pt-2 border-t border-gray-100">
@@ -1084,21 +1127,49 @@ function emptyGRItem() {
   return {
     productId: '', productName: '', sku: '', satuan: 'Box',
     orderedQty: 0, receivedQty: 0,
-    batchNumber: '', expiryDate: '', manufacturingDate: '',
-    storageCondition: 'Suhu Kamar', conditionStatus: 'baik', notes: '',
+    discount: 0,
+    batchNumber: '', expiryDate: '', notes: '',
     price: 0,
   };
 }
 
-function getNetUnitPriceFromPOItem(item) {
-  const basePrice = Number(item?.unitprice ?? item?.unitPrice ?? item?.price ?? 0);
-  const discountRaw = Number(item?.discount ?? 0);
-  if (!basePrice || !discountRaw) return basePrice;
+function getPOUnitPriceFromItem(item) {
+  return Number(item?.unitprice ?? item?.unitPrice ?? item?.price ?? 0);
+}
 
-  // PO discount commonly comes as percentage (e.g. 5 means 5%).
-  // If value is >100, treat it as nominal discount amount.
-  const discountAmount = discountRaw > 100 ? discountRaw : (basePrice * discountRaw) / 100;
-  return Math.max(0, basePrice - discountAmount);
+function getInventoryUnitPriceFromProduct(product) {
+  return Number(
+    product?.lastPurchasePrice
+    ?? product?.lastPrice
+    ?? product?.purchasePrice
+    ?? product?.hpp
+    ?? 0,
+  );
+}
+
+function mapPOItemsToGRItems(poItems, fallbackItems = []) {
+  if (!Array.isArray(poItems) || poItems.length === 0) return fallbackItems;
+
+  return poItems.map((item) => {
+    const prod = item?.product || item?.productId;
+    const productId = typeof prod === 'object' ? prod?._id : prod || '';
+    const inventoryPrice = typeof prod === 'object' ? getInventoryUnitPriceFromProduct(prod) : 0;
+
+    return {
+      productId,
+      productName: typeof prod === 'object' ? prod?.name : item?.productName || '',
+      sku: typeof prod === 'object' ? prod?.sku : item?.sku || '',
+      satuan: item?.satuan || 'Box',
+      orderedQty: Number(item?.quantity ?? item?.orderedQty ?? item?.remainingQty ?? 0),
+      receivedQty: 0,
+      discount: Number(item?.discount ?? 0),
+      batchNumber: '',
+      expiryDate: '',
+      notes: '',
+      // Prefer inventory last price. If not available, fallback to PO raw unit price (before discount).
+      price: inventoryPrice > 0 ? inventoryPrice : getPOUnitPriceFromItem(item),
+    };
+  });
 }
 
 function formatCurrency(amount) {

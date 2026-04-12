@@ -38,8 +38,9 @@ const useSupplierStore = create((set, get) => ({
       if (filters.sort) params.sort = filters.sort;
 
       const { data } = await supplierService.getAll(params);
+      const supplierList = Array.isArray(data?.data) ? data.data : [];
       set({
-        suppliers: data.data,
+        suppliers: supplierList,
         pagination: data.meta?.pagination || null,
         isLoading: false,
       });

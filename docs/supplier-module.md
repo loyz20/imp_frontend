@@ -23,35 +23,33 @@
 {
   _id: ObjectId,
   name: String,              // Wajib. 2-200 karakter, unik (case-insensitive)
-  code: String,              // Max 50, unik
+  code: String,              // Auto-generate backend, unik
   type: String,              // Enum SUPPLIER_TYPE
   contactPerson: String,     // Max 200
   phone: String,             // Format Indonesia (max 30)
-  email: String,             // Format email valid
-  website: String,           // Format URL
 
   address: {
     street: String,          // Max 500
     city: String,            // Max 100
     province: String,        // Max 100
-    postalCode: String,      // Max 10
-    country: String,         // Max 100, default: "Indonesia"
   },
 
-  // ── Izin PBF ──
-  pbfLicense: {
+  // ── Izin Sarana ──
+  izinSarana: {
     number: String,
-    issuedDate: Date,
     expiryDate: Date,
-    document: String,        // Path file
   },
 
-  // ── Sertifikat CDOB ──
-  cdobCertificate: {
+  // ── Nomor CDOB/CDAKB ──
+  cdobCdakb: {
     number: String,
-    issuedDate: Date,
     expiryDate: Date,
-    document: String,
+  },
+
+  // ── Nomor SIP/SIK ──
+  sipSik: {
+    number: String,
+    expiryDate: Date,
   },
 
   paymentTermDays: Number,   // 0-365, default: 30
@@ -80,6 +78,7 @@
 | Value | Label |
 |-------|-------|
 | `pbf` | Pedagang Besar Farmasi |
+| `dak` | DAK |
 | `industri` | Industri Farmasi |
 | `importir` | Importir |
 | `distributor_alkes` | Distributor Alat Kesehatan |
@@ -134,9 +133,10 @@ GET /suppliers
       "type": "pbf",
       "contactPerson": "Budi Santoso",
       "phone": "021-12345678",
-      "email": "order@kimiafarma.co.id",
       "address": { "city": "Jakarta", "province": "DKI Jakarta" },
-      "pbfLicense": { "number": "PBF-123", "expiryDate": "2028-12-31" },
+      "izinSarana": { "number": "IS-123", "expiryDate": "2028-12-31" },
+      "cdobCdakb": { "number": "CDOB-123", "expiryDate": "2028-10-31" },
+      "sipSik": { "number": "SIP-123", "expiryDate": "2027-12-31" },
       "paymentTermDays": 30,
       "isActive": true
     }
@@ -193,15 +193,14 @@ POST /suppliers
 | Field | Type | Required | Validation |
 |-------|------|----------|------------|
 | `name` | `string` | ✅ | 2-200 karakter, unik |
-| `code` | `string` | ❌ | Max 50, unik |
+| `code` | `string` | ❌ | Auto-generate backend |
 | `type` | `string` | ❌ | Enum `SUPPLIER_TYPE` |
 | `contactPerson` | `string` | ❌ | Max 200 |
 | `phone` | `string` | ❌ | Format Indonesia (max 30) |
-| `email` | `string` | ❌ | Format email valid |
-| `website` | `string` | ❌ | Format URL |
-| `address` | `object` | ❌ | Sub-fields: street, city, province, postalCode, country |
-| `pbfLicense` | `object` | ❌ | number, issuedDate, expiryDate, document |
-| `cdobCertificate` | `object` | ❌ | number, issuedDate, expiryDate, document |
+| `address` | `object` | ❌ | Sub-fields: street, city, province |
+| `izinSarana` | `object` | ❌ | number, expiryDate |
+| `cdobCdakb` | `object` | ❌ | number, expiryDate |
+| `sipSik` | `object` | ❌ | number, expiryDate |
 | `paymentTermDays` | `number` | ❌ | 0-365 |
 | `bankAccount` | `object` | ❌ | bankName, accountNumber, accountName |
 | `npwp` | `string` | ❌ | Max 30 |
@@ -251,8 +250,8 @@ PATCH /suppliers/:id/status
 
 ## Validasi & Business Rules
 
-1. **Nama unik** (case-insensitive) dan **code unik**
+1. **Nama unik** (case-insensitive), dan **code** dibuat otomatis backend
 2. **Hard delete** — data supplier dihapus permanen
-3. **PBF License tracking** — izin PBF dicek expired/near-expiry di stats
+3. **License tracking** — Izin Sarana, CDOB/CDAKB, dan SIP/SIK dicek expired/near-expiry di stats
 4. **Payment term** — default 30 hari, digunakan sebagai term pembayaran pada PO
 5. Supplier harus **aktif** untuk digunakan di Purchase Order baru

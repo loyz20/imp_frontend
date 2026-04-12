@@ -35,10 +35,10 @@
 
   // ── Informasi Umum ──
   name: String,              // Wajib. Nama produk (2-200 karakter, unik case-insensitive)
-  sku: String,               // Unik. Auto-generate jika kosong (format: PRD-YYYYMMDD-XXXX)
+  sku: String,               // Wajib. Kode produk: F0001 (obat) / A0001 (alkes)
   barcode: String,           // Opsional. EAN-13 / Code-128 (unik jika diisi)
-  category: String,          // Wajib. Enum kategori produk
-  golongan: String,          // Wajib. Enum golongan obat (regulasi BPOM)
+  category: String,          // Wajib. Enum: obat | alkes
+  golongan: String,          // Wajib. Enum golongan berdasarkan kategori
 
   // ── Regulasi & Registrasi ──
   nie: String,               // Nomor Izin Edar (format: DKL|DKT|DBL|DTL|DKI|DBI|FF|SD|TR|AKL|AKI + digit)
@@ -46,29 +46,21 @@
 
   // ── Informasi Farmasi ──
   bentukSediaan: String,     // Enum bentuk sediaan (24 opsi)
-  kekuatan: String,          // Kekuatan/dosis (contoh: "500mg", "10mg/5mL")
   zatAktif: String,          // Zat aktif / komposisi lengkap (max 500 karakter)
-  golonganTerapi: String,    // Golongan terapi (contoh: "Antibiotik", "Analgesik")
 
   // ── Satuan & Konversi ──
   satuan: String,            // Satuan besar (Box, Botol, dll)
   satuanKecil: String,       // Satuan kecil (Tablet, Kapsul, mL)
   isiPerSatuan: Number,      // Konversi: jumlah satuan kecil per satuan besar (min: 1)
 
-  // ── Harga ──
-  hna: Number,               // Harga Netto Apotek (Rp, min: 0)
-  het: Number,               // Harga Eceran Tertinggi (Rp, min: 0)
-  hargaBeli: Number,         // Harga beli/perolehan (Rp, min: 0)
-  hargaJual: Number,         // Harga jual ke pelanggan (Rp, min: 0)
+  // ── Pajak ──
   ppn: Boolean,              // Apakah dikenakan PPN (default: true)
 
-  // ── Stok & Penyimpanan ──
+  // ── Stok ──
   stokMinimum: Number,       // Alert threshold stok minimum per produk (overrides global lowStockThreshold)
-  suhuPenyimpanan: String,   // Enum suhu penyimpanan (CDOB compliance)
 
   // ── Produsen ──
   manufacturer: String,      // Nama pabrik / industri farmasi (max 200)
-  countryOfOrigin: String,   // Negara asal (default: "Indonesia", max 100)
 
   // ── Lainnya ──
   keterangan: String,        // Catatan tambahan (max 1000)
@@ -94,26 +86,33 @@
 |-------|-------|
 | `obat` | Obat |
 | `alkes` | Alat Kesehatan |
-| `bhp` | Bahan Habis Pakai |
-| `suplemen` | Suplemen |
-| `kosmetik` | Kosmetik |
-| `obat_tradisional` | Obat Tradisional |
-| `lainnya` | Lainnya |
 
-### Golongan Obat (`GOLONGAN_OBAT`)
+### Golongan Produk (`GOLONGAN_PRODUK`)
+
+#### Kategori Obat
 
 | Value | Label | Regulasi |
 |-------|-------|----------|
-| `narkotika` | Narkotika | SP Khusus, double-lock storage |
-| `psikotropika` | Psikotropika | SP Khusus |
-| `obat_keras` | Obat Keras (K) | Butuh resep dokter |
-| `obat_keras_terbatas` | Obat Keras Terbatas (W) | |
-| `obat_bebas_terbatas` | Obat Bebas Terbatas (P) | |
-| `obat_bebas` | Obat Bebas (G) | |
-| `fitofarmaka` | Fitofarmaka | |
-| `oht` | Obat Herbal Terstandar | |
-| `jamu` | Jamu | |
-| `non_obat` | Non Obat | |
+| `prekursor` | Prekursor | Sesuai ketentuan regulasi |
+| `obat_tertentu` | Obat Tertentu | Sesuai ketentuan regulasi |
+| `obat_keras` | Obat Keras | Butuh resep/fasilitas berizin |
+| `obat_bebas_terbatas` | Obat Bebas Terbatas | |
+| `obat_bebas` | Obat Bebas | |
+| `suplemen` | Suplemen | |
+| `obat_tradisional` | Obat Tradisional | |
+| `lainnya` | Lainnya | |
+
+#### Kategori Alat Kesehatan
+
+| Value | Label |
+|-------|-------|
+| `elektromedik_non_radiasi` | Elektromedik Non Radiasi |
+| `non_elektromedik_non_steril` | Non Elektromedik Non Steril |
+| `non_elektromedik_steril` | Non Elektromedik Steril |
+| `diagnostik_invitro` | Diagnostik Invitro |
+| `bmhp` | BMHP |
+| `pkrt` | PKRT |
+| `lainnya` | Lainnya |
 
 ### Bentuk Sediaan (`BENTUK_SEDIAAN`)
 
@@ -122,17 +121,6 @@
 ### Satuan (`SATUAN`)
 
 `Box`, `Botol`, `Tube`, `Strip`, `Blister`, `Ampul`, `Vial`, `Sachet`, `Pcs`, `Pack`, `Rol`, `Lembar`, `Set`, `Kg`, `Gram`, `Liter`, `mL`
-
-### Suhu Penyimpanan (`SUHU_PENYIMPANAN`)
-
-| Value | Rentang | Keterangan |
-|-------|---------|------------|
-| `ruangan` | 15-30°C | CRT (Controlled Room Temperature) |
-| `sejuk` | 8-15°C | Cool storage |
-| `dingin` | 2-8°C | Refrigerator |
-| `beku` | ≤ -20°C | Freezer |
-
----
 
 ## Endpoints
 
@@ -166,10 +154,9 @@ GET /products
 | `limit` | `integer` | `10` | Jumlah per halaman (max 100) |
 | `search` | `string` | | Cari di `name`, `sku`, `nie`, `barcode`, `zatAktif` (max 200 char) |
 | `category` | `string` | | Filter kategori produk |
-| `golongan` | `string` | | Filter golongan obat |
+| `golongan` | `string` | | Filter golongan produk |
 | `isActive` | `boolean` | | Filter status aktif |
 | `manufacturer` | `string` | | Filter pabrik |
-| `suhuPenyimpanan` | `string` | | Filter suhu penyimpanan |
 | `sort` | `string` | `-createdAt` | Sorting field |
 
 **Response `200 OK`:**
@@ -181,7 +168,7 @@ GET /products
     {
       "_id": "660a...",
       "name": "Amoxicillin 500mg",
-      "sku": "PRD-20260401-0001",
+      "sku": "F0001",
       "barcode": "8991234567890",
       "category": "obat",
       "golongan": "obat_keras",
@@ -190,11 +177,8 @@ GET /products
       "satuan": "Box",
       "satuanKecil": "Kapsul",
       "isiPerSatuan": 100,
-      "hargaBeli": 25000,
-      "hargaJual": 35000,
       "ppn": true,
       "stokMinimum": 50,
-      "suhuPenyimpanan": "ruangan",
       "manufacturer": "PT Kimia Farma",
       "isActive": true,
       "createdAt": "2026-04-01T10:00:00.000Z"
@@ -232,23 +216,13 @@ GET /products/stats
     "inactive": 20,
     "byCategory": {
       "obat": 80,
-      "alkes": 30,
-      "bhp": 20,
-      "suplemen": 10,
-      "lainnya": 10
+      "alkes": 30
     },
     "byGolongan": {
       "obat_keras": 50,
       "obat_bebas": 30,
-      "narkotika": 5,
-      "psikotropika": 10,
-      "non_obat": 55
-    },
-    "bySuhuPenyimpanan": {
-      "ruangan": 100,
-      "sejuk": 20,
-      "dingin": 25,
-      "beku": 5
+      "prekursor": 8,
+      "elektromedik_non_radiasi": 12
     }
   }
 }

@@ -2,17 +2,19 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import useSupplierStore from '../../store/supplierStore';
 import useAuthStore from '../../store/authStore';
+import useSettings from '../../hooks/useSettings';
 import Pagination from '../../components/Pagination';
 import toast from 'react-hot-toast';
 import {
   Plus, Eye, SquarePen, Trash2, X, Check, AlertTriangle,
-  Building2, Phone, Mail, MapPin, FileText, Globe, User,
+  Building2, Phone, MapPin, FileText, User,
   Loader2, ShieldCheck, Truck, CreditCard, Clock, CheckCircle, Ban,
 } from 'lucide-react';
 
 /* ── Constants ── */
 const SUPPLIER_TYPES = [
   { value: 'pbf', label: 'PBF' },
+  { value: 'dak', label: 'DAK' },
   { value: 'industri', label: 'Industri' },
   { value: 'importir', label: 'Importir' },
   { value: 'distributor_alkes', label: 'Distributor Alkes' },
@@ -48,6 +50,7 @@ export default function SupplierManagement() {
 
   const canCrud = CAN_CRUD_ROLES.includes(userRole);
   const canDelete = CAN_DELETE_ROLES.includes(userRole);
+  const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
 
   const [showForm, setShowForm] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -103,7 +106,7 @@ export default function SupplierManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Manajemen Supplier</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola data supplier PBF, industri, importir, distributor alkes, dan lainnya.</p>
+          <p className="text-sm text-gray-500 mt-1">Kelola data supplier PBF, DAK, industri, importir, distributor alkes, dan lainnya.</p>
         </div>
         <div className="flex items-center gap-2">
           {canCrud && (
@@ -197,7 +200,7 @@ export default function SupplierManagement() {
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Tipe</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Kontak</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Kota</th>
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">CDOB</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">CDOB/CDAKB</th>
                 <th className="text-center px-5 py-3.5 font-semibold text-gray-600">Status</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Aksi</th>
               </tr>
@@ -210,7 +213,7 @@ export default function SupplierManagement() {
                     <p className="text-sm text-gray-400 mt-2">Memuat data...</p>
                   </td>
                 </tr>
-              ) : suppliers.length === 0 ? (
+              ) : safeSuppliers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
                     <Truck className="w-10 h-10 text-gray-300 mx-auto" />
@@ -218,7 +221,7 @@ export default function SupplierManagement() {
                   </td>
                 </tr>
               ) : (
-                suppliers.map((supplier) => (
+                safeSuppliers.map((supplier) => (
                   <tr key={sid(supplier)} className="hover:bg-gray-50/50 transition-colors">
                     {/* Supplier info */}
                     <td className="px-5 py-3.5">
@@ -250,11 +253,11 @@ export default function SupplierManagement() {
                     <td className="px-5 py-3.5 text-gray-600 hidden lg:table-cell">
                       {supplier.address?.city || '-'}
                     </td>
-                    {/* CDOB */}
+                    {/* CDOB/CDAKB */}
                     <td className="px-5 py-3.5 hidden xl:table-cell">
-                      {supplier.cdobCertificate?.number ? (
+                      {(supplier.cdobCdakb?.number || supplier.cdobCdakbLicense?.number || supplier.cdobCertificate?.number) ? (
                         <span className="inline-flex items-center gap-1 text-xs text-emerald-700">
-                          <ShieldCheck size={12} /> {supplier.cdobCertificate.number}
+                          <ShieldCheck size={12} /> {supplier.cdobCdakb?.number || supplier.cdobCdakbLicense?.number || supplier.cdobCertificate?.number}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">-</span>
@@ -338,6 +341,7 @@ export default function SupplierManagement() {
    ═══════════════════════════════════════ */
 function SupplierFormModal({ supplier, onClose, onSaved }) {
   const { createSupplier, updateSupplier } = useSupplierStore();
+  const { dateFormat = 'DD/MM/YYYY' } = useSettings();
   const isEdit = !!supplier;
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -350,25 +354,34 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
     // Kontak
     contactPerson: supplier?.contactPerson || '',
     phone: supplier?.phone || '',
-    email: supplier?.email || '',
-    website: supplier?.website || '',
     // Alamat
     address: {
       street: supplier?.address?.street || '',
       city: supplier?.address?.city || '',
       province: supplier?.address?.province || '',
-      postalCode: supplier?.address?.postalCode || '',
-      country: supplier?.address?.country || 'Indonesia',
     },
-    // Sertifikat CDOB
-    cdobCertificate: {
-      number: supplier?.cdobCertificate?.number || '',
-      expiryDate: supplier?.cdobCertificate?.expiryDate ? supplier.cdobCertificate.expiryDate.slice(0, 10) : '',
+    // Perizinan
+    izinSarana: {
+      number: supplier?.izinSarana?.number || supplier?.facilityLicense?.number || supplier?.pbfLicense?.number || '',
+      expiryDate: supplier?.izinSarana?.expiryDate
+        ? supplier.izinSarana.expiryDate.slice(0, 10)
+        : (supplier?.facilityLicense?.expiryDate
+          ? supplier.facilityLicense.expiryDate.slice(0, 10)
+          : (supplier?.pbfLicense?.expiryDate ? supplier.pbfLicense.expiryDate.slice(0, 10) : '')),
     },
-    // Izin PBF
-    pbfLicense: {
-      number: supplier?.pbfLicense?.number || '',
-      expiryDate: supplier?.pbfLicense?.expiryDate ? supplier.pbfLicense.expiryDate.slice(0, 10) : '',
+    cdobCdakb: {
+      number: supplier?.cdobCdakb?.number || supplier?.cdobCdakbLicense?.number || supplier?.cdobCertificate?.number || '',
+      expiryDate: supplier?.cdobCdakb?.expiryDate
+        ? supplier.cdobCdakb.expiryDate.slice(0, 10)
+        : (supplier?.cdobCdakbLicense?.expiryDate
+          ? supplier.cdobCdakbLicense.expiryDate.slice(0, 10)
+          : (supplier?.cdobCertificate?.expiryDate ? supplier.cdobCertificate.expiryDate.slice(0, 10) : '')),
+    },
+    sipSik: {
+      number: supplier?.sipSik?.number || supplier?.sipSikLicense?.number || '',
+      expiryDate: supplier?.sipSik?.expiryDate
+        ? supplier.sipSik.expiryDate.slice(0, 10)
+        : (supplier?.sipSikLicense?.expiryDate ? supplier.sipSikLicense.expiryDate.slice(0, 10) : ''),
     },
     // Pembayaran
     paymentTermDays: supplier?.paymentTermDays ?? 30,
@@ -383,6 +396,29 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
     isActive: supplier?.isActive ?? true,
   });
 
+  const [dateDrafts, setDateDrafts] = useState({
+    izinSaranaExpiry: formatDateInputByFormat(
+      supplier?.izinSarana?.expiryDate || supplier?.facilityLicense?.expiryDate || supplier?.pbfLicense?.expiryDate || '',
+      dateFormat,
+    ),
+    cdobCdakbExpiry: formatDateInputByFormat(
+      supplier?.cdobCdakb?.expiryDate || supplier?.cdobCdakbLicense?.expiryDate || supplier?.cdobCertificate?.expiryDate || '',
+      dateFormat,
+    ),
+    sipSikExpiry: formatDateInputByFormat(
+      supplier?.sipSik?.expiryDate || supplier?.sipSikLicense?.expiryDate || '',
+      dateFormat,
+    ),
+  });
+
+  useEffect(() => {
+    setDateDrafts({
+      izinSaranaExpiry: formatDateInputByFormat(form.izinSarana.expiryDate, dateFormat),
+      cdobCdakbExpiry: formatDateInputByFormat(form.cdobCdakb.expiryDate, dateFormat),
+      sipSikExpiry: formatDateInputByFormat(form.sipSik.expiryDate, dateFormat),
+    });
+  }, [form.izinSarana.expiryDate, form.cdobCdakb.expiryDate, form.sipSik.expiryDate, dateFormat]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
@@ -395,6 +431,30 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
     }));
   };
 
+  const handleDateDraftChange = (key, value) => {
+    setDateDrafts((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const commitDateDraft = (key, parent, field) => {
+    const rawValue = dateDrafts[key] ?? '';
+    if (!rawValue.trim()) {
+      handleNestedChange(parent, field, '');
+      return;
+    }
+
+    const isoValue = parseDateInputByFormat(rawValue, dateFormat);
+    if (!isoValue) {
+      toast.error(`Format tanggal harus ${dateFormat}`);
+      setDateDrafts((prev) => ({
+        ...prev,
+        [key]: formatDateInputByFormat(form[parent]?.[field], dateFormat),
+      }));
+      return;
+    }
+
+    handleNestedChange(parent, field, isoValue);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -403,7 +463,39 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
     }
     setLoading(true);
     try {
-      const payload = { ...form };
+      const toOptionalText = (value) => {
+        const text = typeof value === 'string' ? value.trim() : value;
+        return text ? text : null;
+      };
+      const toLicense = (license) => ({
+        number: toOptionalText(license?.number),
+        expiryDate: license?.expiryDate || null,
+      });
+
+      const payload = {
+        name: form.name.trim(),
+        type: form.type,
+        contactPerson: toOptionalText(form.contactPerson),
+        phone: toOptionalText(form.phone),
+        address: {
+          street: toOptionalText(form.address?.street),
+          city: toOptionalText(form.address?.city),
+          province: toOptionalText(form.address?.province),
+        },
+        izinSarana: toLicense(form.izinSarana),
+        cdobCdakb: toLicense(form.cdobCdakb),
+        sipSik: toLicense(form.sipSik),
+        paymentTermDays: Number(form.paymentTermDays ?? 30),
+        bankAccount: {
+          bankName: toOptionalText(form.bankAccount?.bankName),
+          accountNumber: toOptionalText(form.bankAccount?.accountNumber),
+          accountName: toOptionalText(form.bankAccount?.accountName),
+        },
+        npwp: toOptionalText(form.npwp),
+        notes: toOptionalText(form.notes),
+        isActive: !!form.isActive,
+      };
+
       if (isEdit) {
         await updateSupplier(sid(supplier), payload);
         toast.success('Supplier berhasil diperbarui');
@@ -483,10 +575,11 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                   <input
                     name="code"
                     value={form.code}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="SUP-001"
+                    readOnly
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm outline-none"
+                    placeholder="Auto-generate backend"
                   />
+                  <p className="text-xs text-gray-500 mt-1.5">Kode dibuat otomatis oleh backend.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe Supplier</label>
@@ -561,27 +654,6 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                     placeholder="021-xxxxxxxx"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="info@supplier.co.id"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Website</label>
-                  <input
-                    name="website"
-                    value={form.website}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                    placeholder="https://supplier.co.id"
-                  />
-                </div>
               </div>
 
               <h3 className="text-sm font-semibold text-gray-800 pt-3">Alamat</h3>
@@ -611,22 +683,6 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                     className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode Pos</label>
-                  <input
-                    value={form.address.postalCode}
-                    onChange={(e) => handleNestedChange('address', 'postalCode', e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Negara</label>
-                  <input
-                    value={form.address.country}
-                    onChange={(e) => handleNestedChange('address', 'country', e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -636,25 +692,28 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-600" />
-                  Sertifikat CDOB
+                  <FileText size={16} className="text-blue-600" />
+                  Izin Sarana
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor CDOB</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor Izin Sarana</label>
                     <input
-                      value={form.cdobCertificate.number}
-                      onChange={(e) => handleNestedChange('cdobCertificate', 'number', e.target.value)}
+                      value={form.izinSarana.number}
+                      onChange={(e) => handleNestedChange('izinSarana', 'number', e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                      placeholder="CDOB-XXXXXXXXXX"
+                      placeholder="IS-XXXXXXXXXX"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired</label>
                     <input
-                      type="date"
-                      value={form.cdobCertificate.expiryDate}
-                      onChange={(e) => handleNestedChange('cdobCertificate', 'expiryDate', e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={dateDrafts.izinSaranaExpiry}
+                      onChange={(e) => handleDateDraftChange('izinSaranaExpiry', e.target.value)}
+                      onBlur={() => commitDateDraft('izinSaranaExpiry', 'izinSarana', 'expiryDate')}
+                      placeholder={dateFormat}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
@@ -663,25 +722,58 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
 
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <FileText size={16} className="text-blue-600" />
-                  Izin PBF
+                  <ShieldCheck size={16} className="text-emerald-600" />
+                  Nomor CDOB/CDAKB
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor Izin PBF</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor CDOB/CDAKB</label>
                     <input
-                      value={form.pbfLicense.number}
-                      onChange={(e) => handleNestedChange('pbfLicense', 'number', e.target.value)}
+                      value={form.cdobCdakb.number}
+                      onChange={(e) => handleNestedChange('cdobCdakb', 'number', e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                      placeholder="PBF-XXXXXXXXXX"
+                      placeholder="CDOB/CDAKB-XXXXXXXXXX"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired</label>
                     <input
-                      type="date"
-                      value={form.pbfLicense.expiryDate}
-                      onChange={(e) => handleNestedChange('pbfLicense', 'expiryDate', e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={dateDrafts.cdobCdakbExpiry}
+                      onChange={(e) => handleDateDraftChange('cdobCdakbExpiry', e.target.value)}
+                      onBlur={() => commitDateDraft('cdobCdakbExpiry', 'cdobCdakb', 'expiryDate')}
+                      placeholder={dateFormat}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <FileText size={16} className="text-indigo-600" />
+                  Nomor SIP/SIK
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor SIP/SIK</label>
+                    <input
+                      value={form.sipSik.number}
+                      onChange={(e) => handleNestedChange('sipSik', 'number', e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      placeholder="SIP/SIK-XXXXXXXXXX"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={dateDrafts.sipSikExpiry}
+                      onChange={(e) => handleDateDraftChange('sipSikExpiry', e.target.value)}
+                      onBlur={() => commitDateDraft('sipSikExpiry', 'sipSik', 'expiryDate')}
+                      placeholder={dateFormat}
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
@@ -694,8 +786,8 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                   <div>
                     <p className="text-sm font-medium text-amber-800">Regulasi Perizinan</p>
                     <p className="text-xs text-amber-700 mt-1">
-                      Sesuai regulasi BPOM, setiap supplier/PBF harus memiliki sertifikat CDOB dan Izin PBF yang valid.
-                      Sistem akan memberikan peringatan jika sertifikat mendekati masa expired.
+                      Pastikan Izin Sarana, Nomor CDOB/CDAKB, dan Nomor SIP/SIK selalu valid.
+                      Sistem akan memberikan peringatan jika dokumen mendekati masa expired.
                     </p>
                   </div>
                 </div>
@@ -809,6 +901,9 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
 function SupplierDetailModal({ supplier, onClose }) {
   const [activeTab, setActiveTab] = useState(0);
   const TABS = ['Umum', 'Kontak', 'Perizinan', 'Pembayaran'];
+  const izinSarana = supplier.izinSarana || supplier.facilityLicense || supplier.pbfLicense;
+  const cdobCdakb = supplier.cdobCdakb || supplier.cdobCdakbLicense || supplier.cdobCertificate;
+  const sipSik = supplier.sipSik || supplier.sipSikLicense;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -911,8 +1006,6 @@ function SupplierDetailModal({ supplier, onClose }) {
                 <div className="space-y-1">
                   <InfoRow label="Nama Kontak" value={supplier.contactPerson} icon={User} />
                   <InfoRow label="Telepon" value={supplier.phone} icon={Phone} />
-                  <InfoRow label="Email" value={supplier.email} icon={Mail} />
-                  <InfoRow label="Website" value={supplier.website} icon={Globe} />
                 </div>
               </div>
               <div>
@@ -921,8 +1014,6 @@ function SupplierDetailModal({ supplier, onClose }) {
                   <InfoRow label="Jalan" value={supplier.address?.street} icon={MapPin} />
                   <InfoRow label="Kota" value={supplier.address?.city} />
                   <InfoRow label="Provinsi" value={supplier.address?.province} />
-                  <InfoRow label="Kode Pos" value={supplier.address?.postalCode} />
-                  <InfoRow label="Negara" value={supplier.address?.country} />
                 </div>
               </div>
             </div>
@@ -932,21 +1023,21 @@ function SupplierDetailModal({ supplier, onClose }) {
             <div className="space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-600" />
-                  Sertifikat CDOB
+                  <FileText size={16} className="text-blue-600" />
+                  Izin Sarana
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-400">Nomor CDOB</p>
-                      <p className="text-sm font-medium text-gray-800 mt-0.5">{supplier.cdobCertificate?.number || '-'}</p>
+                      <p className="text-xs text-gray-400">Nomor Izin Sarana</p>
+                      <p className="text-sm font-medium text-gray-800 mt-0.5">{izinSarana?.number || '-'}</p>
                     </div>
-                    <LicenseStatus date={supplier.cdobCertificate?.expiryDate} />
+                    <LicenseStatus date={izinSarana?.expiryDate} />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Tanggal Expired</p>
-                    <p className={`text-sm font-medium mt-0.5 ${isExpired(supplier.cdobCertificate?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
-                      {formatDate(supplier.cdobCertificate?.expiryDate)}
+                    <p className={`text-sm font-medium mt-0.5 ${isExpired(izinSarana?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
+                      {formatDate(izinSarana?.expiryDate)}
                     </p>
                   </div>
                 </div>
@@ -954,21 +1045,43 @@ function SupplierDetailModal({ supplier, onClose }) {
 
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <FileText size={16} className="text-blue-600" />
-                  Izin PBF
+                  <ShieldCheck size={16} className="text-emerald-600" />
+                  Nomor CDOB/CDAKB
                 </h3>
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-400">Nomor Izin PBF</p>
-                      <p className="text-sm font-medium text-gray-800 mt-0.5">{supplier.pbfLicense?.number || '-'}</p>
+                      <p className="text-xs text-gray-400">Nomor CDOB/CDAKB</p>
+                      <p className="text-sm font-medium text-gray-800 mt-0.5">{cdobCdakb?.number || '-'}</p>
                     </div>
-                    <LicenseStatus date={supplier.pbfLicense?.expiryDate} />
+                    <LicenseStatus date={cdobCdakb?.expiryDate} />
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">Tanggal Expired</p>
-                    <p className={`text-sm font-medium mt-0.5 ${isExpired(supplier.pbfLicense?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
-                      {formatDate(supplier.pbfLicense?.expiryDate)}
+                    <p className={`text-sm font-medium mt-0.5 ${isExpired(cdobCdakb?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
+                      {formatDate(cdobCdakb?.expiryDate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-indigo-600" />
+                  Nomor SIP/SIK
+                </h3>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-400">Nomor SIP/SIK</p>
+                      <p className="text-sm font-medium text-gray-800 mt-0.5">{sipSik?.number || '-'}</p>
+                    </div>
+                    <LicenseStatus date={sipSik?.expiryDate} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Tanggal Expired</p>
+                    <p className={`text-sm font-medium mt-0.5 ${isExpired(sipSik?.expiryDate) ? 'text-red-600' : 'text-gray-800'}`}>
+                      {formatDate(sipSik?.expiryDate)}
                     </p>
                   </div>
                 </div>
@@ -1072,4 +1185,37 @@ function debounce(fn, ms) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
+}
+
+function formatDateInputByFormat(isoDate, format) {
+  if (!isoDate) return '';
+  const [year, month, day] = String(isoDate).split('-');
+  if (!year || !month || !day) return '';
+  if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`;
+  if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateInputByFormat(input, format) {
+  const value = String(input || '').trim();
+  if (!value) return '';
+
+  if (format === 'YYYY-MM-DD') {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+  }
+
+  const parts = value.split('/').map((p) => p.trim());
+  if (parts.length !== 3) return '';
+  const [a, b, c] = parts;
+  if (!/^\d{1,2}$/.test(a) || !/^\d{1,2}$/.test(b) || !/^\d{4}$/.test(c)) return '';
+
+  const day = format === 'MM/DD/YYYY' ? b.padStart(2, '0') : a.padStart(2, '0');
+  const month = format === 'MM/DD/YYYY' ? a.padStart(2, '0') : b.padStart(2, '0');
+  const year = c;
+
+  const d = new Date(`${year}-${month}-${day}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  if (d.getFullYear() !== Number(year) || d.getMonth() + 1 !== Number(month) || d.getDate() !== Number(day)) return '';
+
+  return `${year}-${month}-${day}`;
 }

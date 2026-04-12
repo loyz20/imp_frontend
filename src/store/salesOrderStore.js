@@ -89,6 +89,11 @@ const useSalesOrderStore = create((set, get) => ({
     return data;
   },
 
+  generateInvoice: async (salesOrderIds) => {
+    const { data } = await salesOrderService.generateInvoice(salesOrderIds);
+    return data;
+  },
+
   clearSelectedOrder: () => set({ selectedOrder: null }),
 }));
 
