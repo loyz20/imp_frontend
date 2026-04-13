@@ -1,6 +1,7 @@
 import apiClient from '../api/axios';
 
 const settingsService = {
+    clearData: () => apiClient.post('/admin/clear-data'),
   getAll: () => apiClient.get('/settings'),
 
   getSection: (section) => apiClient.get(`/settings/${section}`),

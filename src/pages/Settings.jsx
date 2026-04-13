@@ -169,23 +169,51 @@ export default function Settings() {
         <p className="text-sm text-gray-500 mt-1">Kelola profil, keamanan, dan preferensi akun Anda.</p>
       </div>
 
+
       {isAdmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Inisialisasi Settings</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Endpoint: POST /settings/initialize. Gunakan saat setup awal aplikasi (sekali).
-            </p>
+        <>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Inisialisasi Settings</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Endpoint: POST /settings/initialize. Gunakan saat setup awal aplikasi (sekali).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleInitializeSettings}
+              disabled={hasInitializedSettings || initLoading}
+              className="px-4 py-2 text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {hasInitializedSettings ? 'Sudah Diinisialisasi' : initLoading ? 'Memproses...' : 'Initialize Settings'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleInitializeSettings}
-            disabled={hasInitializedSettings || initLoading}
-            className="px-4 py-2 text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed bg-amber-600 text-white hover:bg-amber-700"
-          >
-            {hasInitializedSettings ? 'Sudah Diinisialisasi' : initLoading ? 'Memproses...' : 'Initialize Settings'}
-          </button>
-        </div>
+
+          {/* Kosongkan Data Section */}
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+            <div>
+              <p className="text-sm font-semibold text-red-800">Kosongkan Data</p>
+              <p className="text-xs text-red-700 mt-0.5">
+                Endpoint: POST /api/v1/admin/clear-data. Hapus seluruh data transaksi dan master (tidak dapat dibatalkan).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!window.confirm('Yakin ingin mengosongkan seluruh data? TINDAKAN INI TIDAK DAPAT DIBATALKAN!')) return;
+                try {
+                  await settingsService.clearData();
+                  toast.success('Seluruh data berhasil dikosongkan');
+                } catch (err) {
+                  toast.error(err?.response?.data?.message || 'Gagal mengosongkan data');
+                }
+              }}
+              className="px-4 py-2 text-sm font-medium rounded-xl transition-colors bg-red-600 text-white hover:bg-red-700"
+            >
+              <Trash2 className="inline w-4 h-4 mr-2 -mt-0.5" /> Kosongkan Data
+            </button>
+          </div>
+        </>
       )}
 
       <div className="flex gap-6 min-h-150">
