@@ -76,7 +76,7 @@ export default function Dashboard() {
   // Chart helpers
   const maxChartValue = useMemo(() => {
     if (!chartData?.length) return 1;
-    return Math.max(...chartData.flatMap((d) => [d.income || 0, d.expense || 0]), 1);
+    return Math.max(...chartData.flatMap((d) => [(d.revenue || d.income) || 0, d.expense || 0]), 1);
   }, [chartData]);
 
   // Primary KPI cards
@@ -89,22 +89,22 @@ export default function Dashboard() {
 
   // Finance KPI cards (admin/keuangan only)
   const financeCards = isFinance && financeStats ? [
-    { label: 'Total Piutang', value: financeStats.totalReceivable ?? 0, icon: TrendingUp, color: 'from-blue-500 to-blue-600', currency: true },
-    { label: 'Total Hutang', value: financeStats.totalPayable ?? 0, icon: TrendingDown, color: 'from-red-500 to-red-600', currency: true },
-    { label: 'Invoice Outstanding', value: financeStats.invoiceOutstanding ?? 0, icon: FileText, color: 'from-amber-500 to-amber-600' },
-    { label: 'Kas & Bank', value: financeStats.cashBalance ?? 0, icon: Wallet, color: 'from-emerald-500 to-emerald-600', currency: true },
+    { label: 'Total Pendapatan', value: financeStats.totalRevenue ?? 0, icon: TrendingUp, color: 'from-emerald-500 to-emerald-600', currency: true },
+    { label: 'Total Pengeluaran', value: financeStats.totalExpense ?? 0, icon: TrendingDown, color: 'from-red-500 to-red-600', currency: true },
+    { label: 'Laba Bersih', value: financeStats.netProfit ?? 0, icon: BarChart3, color: 'from-blue-500 to-blue-600', currency: true },
+    { label: 'Margin Keuntungan', value: financeStats.margin ?? 0, icon: Wallet, color: 'from-purple-500 to-purple-600', isPercentage: true },
   ] : null;
 
   // Role-based quick actions
   const quickActions = (() => {
     const all = {
-      po: { label: 'Buat Surat Pesanan', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100', path: '/transaksi/po' },
+      po: { label: 'Buat Surat Pesanan', color: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100', path: '/transaksi/pembelian' },
       so: { label: 'Buat Sales Order', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100', path: '/transaksi/penjualan' },
       produk: { label: 'Kelola Produk', color: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100', path: '/master/produk' },
-      stok: { label: 'Lihat Stok', color: 'bg-teal-50 text-teal-700 hover:bg-teal-100', path: '/inventory/stok' },
-      laporan: { label: 'Lihat Laporan', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100', path: '/laporan' },
-      invoice: { label: 'Kelola Invoice', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100', path: '/keuangan/invoice' },
-      pembayaran: { label: 'Pembayaran', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100', path: '/keuangan/pembayaran' },
+      stok: { label: 'Lihat Stok', color: 'bg-teal-50 text-teal-700 hover:bg-teal-100', path: '/inventori/stok' },
+      laporan: { label: 'Lihat Laporan', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100', path: '/laporan/penjualan' },
+      invoice: { label: 'Kelola Invoice', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100', path: '/keuangan/piutang' },
+      pembayaran: { label: 'Pembayaran', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100', path: '/keuangan/hutang' },
       settings: { label: 'Pengaturan', color: 'bg-gray-50 text-gray-700 hover:bg-gray-100', path: '/settings' },
     };
     if (isAdmin) return [all.po, all.so, all.produk, all.stok, all.laporan, all.settings];
@@ -230,7 +230,7 @@ export default function Dashboard() {
                     <Icon size={16} className="text-white" strokeWidth={2} />
                   </div>
                   <span className="text-lg font-bold text-gray-900">
-                    {s.currency ? formatCurrency(s.value) : s.value}
+                    {s.isPercentage ? `${s.value.toFixed(1)}%` : s.currency ? formatCurrency(s.value) : s.value}
                   </span>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export default function Dashboard() {
           {chartData?.length ? (
             <div className="flex items-end gap-3 h-48">
               {chartData.map((d, i) => {
-                const incH = ((d.income || 0) / maxChartValue) * 100;
+                const incH = (((d.revenue || d.income) || 0) / maxChartValue) * 100;
                 const expH = ((d.expense || 0) / maxChartValue) * 100;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -269,7 +269,7 @@ export default function Dashboard() {
                       <div
                         className="w-5 bg-emerald-500 rounded-t-md transition-all"
                         style={{ height: `${Math.max(incH, 2)}%` }}
-                        title={`Pemasukan: ${formatCurrency(d.income || 0)}`}
+                        title={`Pemasukan: ${formatCurrency((d.revenue || d.income) || 0)}`}
                       />
                       <div
                         className="w-5 bg-red-400 rounded-t-md transition-all"

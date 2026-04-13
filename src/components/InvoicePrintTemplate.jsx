@@ -55,9 +55,8 @@ export default function InvoicePrintTemplate({ invoice }) {
                   <div style={companyInfoStyle}>
                     <div style={companyTitleStyle}>{companyName.toUpperCase()}</div>
                     <div style={companyDetailStyle}>{addressLine || '-'}</div>
-                    <div style={companyDetailStyle}>Ijin PBF : {pbfNumber}</div>
-                    <div style={companyDetailStyle}>Sertifikat CDOB : {cdobNumber}</div>
-                    <div style={companyDetailStyle}>NPWP : {npwpNumber}  No Telp : {company.phone || '-'}</div>
+                    <div style={companyDetailStyle}>Ijin PBF : {pbfNumber} &nbsp;&nbsp; Sertifikat CDOB : {cdobNumber}</div>
+                    <div style={companyDetailStyle}>NPWP : {npwpNumber} &nbsp;&nbsp; No Telp : {company.phone || '-'}</div>
                   </div>
                 </div>
               </td>
@@ -122,9 +121,9 @@ export default function InvoicePrintTemplate({ invoice }) {
                 <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.unit}</td>
                 <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.batchNumber}</td>
                 <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.expiryDate}</td>
-                <td style={{ ...itemBodyCellStyle, ...itemRightCellStyle }}>{item.unitPriceText}</td>
+                <td style={{ ...itemBodyCellStyle, ...itemRightCellStyle }}>{item.unitPriceText ? `Rp ${item.unitPriceText}` : ''}</td>
                 <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.discountPercentText}</td>
-                <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.productName ? 'Rp' : ''}</td>
+                <td style={{ ...itemBodyCellStyle, ...itemCenterCellStyle }}>{item.productName ? item.discountAmountText : ''}</td>
                 <td style={{ ...itemBodyCellStyle, ...itemRightCellStyle }}>{item.lineTotalText}</td>
               </tr>
             ))}
@@ -209,6 +208,7 @@ function buildInvoiceRows(items) {
       expiryDate: item?.expiryDate ? fmtDateShort(item.expiryDate) : '-',
       unitPriceText: unitPrice ? fmtNumber(unitPrice) : '',
       discountPercentText: discountPercent ? `${discountPercent}%` : '0%',
+      discountAmountText: fmtNumber(discountAmount),
       lineTotalText: lineTotal ? fmtNumber(lineTotal) : '',
       grossAmount,
       discountAmount,
@@ -406,5 +406,5 @@ const notesCellStyle = {
   wordBreak: 'break-word',
   overflowWrap: 'anywhere',
 };
-const headerCellPlainStyle = { padding: '4px 6px', verticalAlign: 'top' };
+const headerCellPlainStyle = { border: '1px solid #111827', padding: '4px 6px', verticalAlign: 'top' };
 const signaturePlainStyle = { padding: '4px 6px', verticalAlign: 'top', fontSize: '9pt' };

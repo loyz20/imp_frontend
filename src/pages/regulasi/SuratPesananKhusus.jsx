@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import SuratPesananKhususPrintTemplate from '../../components/SuratPesananKhususPrintTemplate';
 import {
   FileText, Plus, Search, Filter, Eye, CheckCircle2, XCircle,
   Send, Loader2, Printer, ChevronDown, AlertTriangle, Shield, Pill,
@@ -40,6 +41,7 @@ export default function SuratPesananKhusus() {
 
   const [showForm, setShowForm] = useState(false);
   const [detailSP, setDetailSP] = useState(null);
+  const [printSP, setPrintSP] = useState(null);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -419,6 +421,12 @@ export default function SuratPesananKhusus() {
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-between">
               <button onClick={async () => { try { await exportSPPdf(detailSP._id, detailSP.spNumber); toast.success('PDF berhasil diunduh'); } catch { toast.error('Gagal mengunduh PDF'); } }} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50">
+                <Printer size={15} /> Export PDF
+              </button>
+              <button
+                onClick={() => { setPrintSP(detailSP); setTimeout(() => window.print(), 200); }}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
                 <Printer size={15} /> Cetak
               </button>
               <button onClick={() => setDetailSP(null)} className="px-4 py-2 bg-gray-100 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-200">Tutup</button>
@@ -426,6 +434,9 @@ export default function SuratPesananKhusus() {
           </div>
         </div>
       )}
+
+      {/* Print Template */}
+      <SuratPesananKhususPrintTemplate sp={printSP} />
     </div>
   );
 }

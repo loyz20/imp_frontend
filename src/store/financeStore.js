@@ -30,7 +30,9 @@ const useFinanceStore = create((set, get) => ({
   fetchDashboardChart: async (params) => {
     try {
       const { data } = await financeService.getDashboardChart(params);
-      set({ chartData: data.data });
+      // Map trend array to chartData, with fallback for different API structures
+      const trend = data.data?.trend || data.data || [];
+      set({ chartData: Array.isArray(trend) ? trend : [] });
     } catch { /* silent */ }
   },
 

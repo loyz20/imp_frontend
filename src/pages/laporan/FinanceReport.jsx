@@ -96,8 +96,7 @@ export default function FinanceReport() {
           {/* Revenue vs Expense Trend */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Pendapatan vs Pengeluaran</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={financeChart?.trend || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#9ca3af" />
@@ -107,15 +106,13 @@ export default function FinanceReport() {
                   <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Pendapatan" />
                   <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} name="Pengeluaran" />
                 </LineChart>
-              </ResponsiveContainer>
-            </div>
+            </ResponsiveContainer>
           </div>
 
           {/* Profit Trend */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Trend Laba Bersih</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={financeChart?.profitTrend || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#9ca3af" />
@@ -123,8 +120,7 @@ export default function FinanceReport() {
                   <Tooltip formatter={(v) => formatCurrency(v)} />
                   <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name="Laba Bersih" />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </ResponsiveContainer>
           </div>
       </div>
 
