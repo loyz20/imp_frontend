@@ -5,6 +5,7 @@ import {
   ShieldCheck, Settings, Users, ChevronDown, ChevronLeft, Building2, Wallet,
 } from 'lucide-react';
 import useSettingsStore from '../store/settingsStore';
+import env from '../config/env';
 
 /* -- Icon components (lucide-react for PBF domain) -- */
 
@@ -46,9 +47,9 @@ const navigation = [
     name: 'Transaksi',
     icon: Icons.transaction,
     children: [
-      { name: 'Pembelian (PO)', href: '/transaksi/pembelian' },
+      { name: 'Pembelian', href: '/transaksi/pembelian' },
       { name: 'Penerimaan Barang', href: '/transaksi/penerimaan' },
-      { name: 'Penjualan (SO)', href: '/transaksi/penjualan' },
+      { name: 'Penjualan', href: '/transaksi/penjualan' },
       { name: 'Retur', href: '/transaksi/retur' },
     ],
   },
@@ -67,8 +68,7 @@ const navigation = [
     name: 'Keuangan',
     icon: Icons.finance,
     children: [
-      { name: 'Chart of Accounts', href: '/keuangan/ledger?tab=accounts' },
-      { name: 'Jurnal Umum', href: '/keuangan/ledger?tab=journals' },
+      { name: 'General Ledger', href: '/keuangan/ledger?tab=accounts' },
       { name: 'Kas & Bank', href: '/keuangan/rekonsiliasi' },
       { name: 'Hutang (AP)', href: '/keuangan/hutang' },
       { name: 'Piutang (AR)', href: '/keuangan/piutang' },
@@ -102,6 +102,7 @@ const navigation = [
 
 export default function Sidebar({ collapsed, onToggle }) {
   const [openMenus, setOpenMenus] = useState({});
+  const [logoLoadError, setLogoLoadError] = useState(false);
   const location = useLocation();
   const settings = useSettingsStore((s) => s.settings);
   const companyName = settings?.company?.name || 'PT. IKO Farma';
@@ -134,6 +135,19 @@ export default function Sidebar({ collapsed, onToggle }) {
     return true;
   };
 
+  const normalizeCompanyLogoSrc = (rawLogo) => {
+    if (!rawLogo) return null;
+    if (rawLogo.startsWith('data:') || rawLogo.startsWith('blob:')) return rawLogo;
+    if (/^(https?:)?\/\//i.test(rawLogo)) return rawLogo;
+
+    const apiOrigin = new URL(env.API_BASE_URL).origin;
+    if (rawLogo.startsWith('/uploads/')) return `${apiOrigin}${rawLogo}`;
+    if (rawLogo.startsWith('uploads/')) return `${apiOrigin}/${rawLogo}`;
+    return rawLogo;
+  };
+
+  const companyLogoSrc = logoLoadError ? null : normalizeCompanyLogoSrc(companyLogo);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -154,15 +168,7 @@ export default function Sidebar({ collapsed, onToggle }) {
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            {companyLogo ? (
-              <img
-                src={companyLogo}
-                alt={companyName}
-                className="w-8 h-8 rounded-lg object-contain shrink-0"
-              />
-            ) : (
-              <span className="text-emerald-600">{Icons.logo}</span>
-            )}
+            <span className="text-emerald-600">{Icons.logo}</span>
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-base font-bold text-gray-900 tracking-tight leading-tight">
@@ -260,9 +266,18 @@ export default function Sidebar({ collapsed, onToggle }) {
         {!collapsed && (
           <div className="p-4 border-t border-gray-100">
             <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-linear-to-r from-emerald-50 to-teal-50">
-              <div className="w-9 h-9 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0">
-                <Building2 className="w-5 h-5" strokeWidth={1.8} />
-              </div>
+              {companyLogoSrc ? (
+                <img
+                  src={companyLogoSrc}
+                  alt={companyName}
+                  className="w-9 h-9 rounded-lg object-contain bg-white border border-emerald-100 shrink-0"
+                  onError={() => setLogoLoadError(true)}
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0">
+                  <Building2 className="w-5 h-5" strokeWidth={1.8} />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-800 truncate">{companyName}</p>
                 <p className="text-[10px] text-gray-500 truncate">{hasCdob ? 'CDOB Certified' : 'PBF'}</p>

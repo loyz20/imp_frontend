@@ -26,6 +26,7 @@ import useSettingsStore from '../store/settingsStore';
 import authService from '../services/authService';
 import settingsService from '../services/settingsService';
 import { setTokens } from '../api/axios';
+import env from '../config/env';
 import toast from 'react-hot-toast';
 
 const ROLE_LABELS = {
@@ -499,6 +500,17 @@ function CompanyTab() {
   const [form, setForm] = useState({});
   const fileInputRef = React.useRef(null);
 
+  const resolveLogoSrc = (rawLogo) => {
+    if (!rawLogo) return null;
+    if (rawLogo.startsWith('data:') || rawLogo.startsWith('blob:')) return rawLogo;
+    if (/^(https?:)?\/\//i.test(rawLogo)) return rawLogo;
+
+    const apiOrigin = new URL(env.API_BASE_URL).origin;
+    if (rawLogo.startsWith('/uploads/')) return `${apiOrigin}${rawLogo}`;
+    if (rawLogo.startsWith('uploads/')) return `${apiOrigin}/${rawLogo}`;
+    return rawLogo;
+  };
+
   useEffect(() => {
     if (data && Object.keys(data).length > 0) {
       setForm({
@@ -562,7 +574,7 @@ function CompanyTab() {
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
                 {form.logo ? (
-                  <img src={form.logo} alt="Logo" className="w-full h-full object-contain" />
+                  <img src={resolveLogoSrc(form.logo)} alt="Logo" className="w-full h-full object-contain" />
                 ) : (
                   <BuildingIcon className="w-8 h-8 text-gray-300" />
                 )}

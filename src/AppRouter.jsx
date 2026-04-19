@@ -96,8 +96,6 @@ function AppRouter() {
 
           {/* Direct login route for backward compatibility */}
           <Route path="/login" element={<Navigate to="/auth/login" replace />} />
-          <Route path="/register" element={<Navigate to="/auth/register" replace />} />
-          <Route path="/forgot-password" element={<Navigate to="/auth/forgot-password" replace />} />
 
           {/* Protected routes wrapped in MainLayout */}
           <Route

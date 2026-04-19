@@ -15,6 +15,7 @@ import {
 const SUPPLIER_TYPES = [
   { value: 'pbf', label: 'PBF' },
   { value: 'dak', label: 'DAK' },
+  { value: 'pbf_dak', label: 'PBF + DAK' },
   { value: 'industri', label: 'Industri' },
   { value: 'importir', label: 'Importir' },
   { value: 'distributor_alkes', label: 'Distributor Alkes' },
@@ -349,7 +350,6 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
   const [form, setForm] = useState({
     // Identitas
     name: supplier?.name || '',
-    code: supplier?.code || '',
     type: supplier?.type || 'pbf',
     // Kontak
     contactPerson: supplier?.contactPerson || '',
@@ -571,17 +571,6 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode Supplier</label>
-                  <input
-                    name="code"
-                    value={form.code}
-                    readOnly
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm outline-none"
-                    placeholder="Auto-generate backend"
-                  />
-                  <p className="text-xs text-gray-500 mt-1.5">Kode dibuat otomatis oleh backend.</p>
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe Supplier</label>
                   <select
                     name="type"
@@ -594,16 +583,16 @@ function SupplierFormModal({ supplier, onClose, onSaved }) {
                     ))}
                   </select>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">NPWP</label>
-                <input
-                  name="npwp"
-                  value={form.npwp}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  placeholder="XX.XXX.XXX.X-XXX.XXX"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">NPWP</label>
+                  <input
+                    name="npwp"
+                    value={form.npwp}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    placeholder="XX.XXX.XXX.X-XXX.XXX"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Catatan</label>

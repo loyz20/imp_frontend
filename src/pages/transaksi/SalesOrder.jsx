@@ -4,14 +4,18 @@ import useAuthStore from '../../store/authStore';
 import useSettings from '../../hooks/useSettings';
 import Pagination from '../../components/Pagination';
 import AutocompleteInput from '../../components/AutocompleteInput';
+import InvoicePrintTemplate from '../../components/InvoicePrintTemplate';
+import SalesOrderPrintTemplate from '../../components/SalesOrderPrintTemplate';
 import customerService from '../../services/customerService';
 import productService from '../../services/productService';
 import inventoryService from '../../services/inventoryService';
+import salesOrderService from '../../services/salesOrderService';
+import financeService from '../../services/financeService';
 import toast from 'react-hot-toast';
 import {
   Plus, Eye, SquarePen, Trash2, X, Check, AlertTriangle,
   ShoppingBag, Package, FileText,
-  Loader2, CheckCircle, Ban, ClipboardList, Truck, MapPin,
+  Loader2, CheckCircle, Ban, ClipboardList, Truck, MapPin, Printer,
 } from 'lucide-react';
 
 /* ── Constants ── */
@@ -50,6 +54,8 @@ export default function SalesOrder() {
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [showDetail, setShowDetail] = useState(null);
+  const [printOrder, setPrintOrder] = useState(null);
+  const [printInvoice, setPrintInvoice] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
@@ -167,6 +173,33 @@ export default function SalesOrder() {
       setIsGeneratingInvoice(false);
     }
   };
+
+  const handlePrint = useCallback(async (order) => {
+    try {
+      const { data } = await salesOrderService.getById(oid(order));
+      setPrintOrder(data.data);
+      setTimeout(() => window.print(), 300);
+    } catch {
+      setPrintOrder(order);
+      setTimeout(() => window.print(), 300);
+    }
+  }, []);
+
+  const handlePrintInvoice = useCallback(async (order) => {
+    const invoiceNumber = getOrderInvoiceFakturNumber(order);
+    if (!invoiceNumber || invoiceNumber === 'Belum dibuat' || invoiceNumber === '-') {
+      toast.error('Nomor invoice belum tersedia');
+      return;
+    }
+
+    try {
+      const { data } = await financeService.getInvoiceByNumber(invoiceNumber);
+      setPrintInvoice(data.data);
+      setTimeout(() => window.print(), 300);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal mengambil data invoice');
+    }
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -299,7 +332,7 @@ export default function SalesOrder() {
                     title="Pilih semua SO berstatus dikirim"
                   />
                 </th>
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. SO</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No Surat Jalan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Pelanggan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Order</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden xl:table-cell">No Invoice</th>
@@ -331,6 +364,8 @@ export default function SalesOrder() {
                   const orderId = oid(order);
                   const isSelectable = normalizedStatus === 'shipped';
                   const isSelected = selectedOrderIds.includes(orderId);
+                  const canPrintOrder = normalizedStatus === 'shipped';
+                  const canPrintInvoice = normalizedStatus === 'awaiting_payment';
                   return (
                     <tr key={orderId} className={`hover:bg-gray-50/50 transition-colors ${isSelected ? 'bg-indigo-50/40' : ''}`}>
                       <td className="px-3 py-3.5 text-center">
@@ -381,6 +416,24 @@ export default function SalesOrder() {
                           >
                             <Eye size={16} />
                           </button>
+                          {canPrintOrder && (
+                            <button
+                              onClick={() => handlePrint(order)}
+                              className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                              title="Cetak Surat Penyerahan"
+                            >
+                              <Printer size={16} />
+                            </button>
+                          )}
+                          {canPrintInvoice && (
+                            <button
+                              onClick={() => handlePrintInvoice(order)}
+                              className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                              title="Cetak Invoice"
+                            >
+                              <FileText size={16} />
+                            </button>
+                          )}
                           {canCrud && normalizedStatus === 'draft' && (
                             <button
                               onClick={() => openEdit(order)}
@@ -444,7 +497,16 @@ export default function SalesOrder() {
           onSaved={() => { closeForm(); fetchOrders(); fetchStats(); }}
         />
       )}
-      {showDetail && <SODetailModal order={showDetail} onClose={() => setShowDetail(null)} />}
+      {showDetail && (
+        <SODetailModal
+          order={showDetail}
+          onClose={() => setShowDetail(null)}
+          onPrintOrder={handlePrint}
+          onPrintInvoice={handlePrintInvoice}
+        />
+      )}
+      <SalesOrderPrintTemplate order={printOrder} />
+      <InvoicePrintTemplate invoice={printInvoice} />
       {deleteConfirm && <DeleteConfirmModal order={deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={handleDelete} />}
     </div>
   );
@@ -480,6 +542,7 @@ function SOFormModal({ order, onClose, onSaved }) {
     orderDate: order?.orderDate ? order.orderDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     expectedDeliveryDate: order?.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : '',
     paymentTermDays: order?.paymentTermDays ?? defaultPaymentTermDays ?? 30,
+    margin: Number(order?.margin ?? 1),
     priceRoundingStep: 100,
     shippingAddress: order?.shippingAddress || '',
     notes: order?.notes || '',
@@ -494,7 +557,6 @@ function SOFormModal({ order, onClose, onSaved }) {
           batchNumber: item.batchNumber || '',
           expiryDate: toDateInputValue(item.expiryDate),
           unitPrice: item.unitPrice || 0,
-          margin: Number(item.margin ?? 20),
           discount: item.discount || 0,
           notes: item.notes || '',
           _splitFrom: item._splitFrom || '',
@@ -628,7 +690,7 @@ function SOFormModal({ order, onClose, onSaved }) {
               batchNumber: firstAvailableBatch.batchNumber || '',
               expiryDate: toDateInputValue(firstAvailableBatch.expiryDate),
               unitPrice: applyPriceRounding(
-                calculateSellingPriceFromMargin(baseBatchPrice, item.margin),
+                calculateSellingPriceFromMargin(baseBatchPrice, prev.margin),
                 prev.priceRoundingStep,
               ),
             };
@@ -670,7 +732,7 @@ function SOFormModal({ order, onClose, onSaved }) {
             batchNumber: firstAvailableBatch.batchNumber || '',
             expiryDate: toDateInputValue(firstAvailableBatch.expiryDate),
             unitPrice: applyPriceRounding(
-              calculateSellingPriceFromMargin(baseBatchPrice, item.margin),
+              calculateSellingPriceFromMargin(baseBatchPrice, prev.margin),
               prev.priceRoundingStep,
             ),
           };
@@ -690,6 +752,32 @@ function SOFormModal({ order, onClose, onSaved }) {
     });
   }, [applyAutoSplitForLine, stockMap]);
 
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        const productStock = stockMap[item.productId];
+        const selectedBatch = findBatchByValue(productStock?.batches || [], item.batchRef || item.batchNumber);
+        if (!selectedBatch) return item;
+
+        const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
+        const nextUnitPrice = applyPriceRounding(
+          calculateSellingPriceFromMargin(baseBatchPrice, prev.margin),
+          prev.priceRoundingStep,
+        );
+
+        if (Number(item.unitPrice) === Number(nextUnitPrice)) {
+          return item;
+        }
+
+        return {
+          ...item,
+          unitPrice: nextUnitPrice,
+        };
+      }),
+    }));
+  }, [form.margin, form.priceRoundingStep, stockMap]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((p) => ({ ...p, [name]: value }));
@@ -700,21 +788,6 @@ function SOFormModal({ order, onClose, onSaved }) {
     const nextItem = { ...items[index], [field]: value };
     const productStock = stockMap[nextItem.productId];
     const selectedBatch = findBatchByValue(productStock?.batches || [], nextItem.batchRef || nextItem.batchNumber);
-
-    if (field === 'margin') {
-      if (selectedBatch) {
-        const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
-        nextItem.unitPrice = applyPriceRounding(
-          calculateSellingPriceFromMargin(baseBatchPrice, value),
-          form.priceRoundingStep,
-        );
-      }
-    }
-
-    if (field === 'unitPrice' && selectedBatch) {
-      const baseBatchPrice = getBatchBaseUnitPrice(selectedBatch);
-      nextItem.margin = calculateMarginFromSellingPrice(baseBatchPrice, value);
-    }
 
     items[index] = nextItem;
 
@@ -759,7 +832,7 @@ function SOFormModal({ order, onClose, onSaved }) {
       batchNumber: selectedBatch.batchNumber || '',
       expiryDate: toDateInputValue(selectedBatch.expiryDate),
       unitPrice: applyPriceRounding(
-        calculateSellingPriceFromMargin(baseBatchPrice, current.margin),
+        calculateSellingPriceFromMargin(baseBatchPrice, form.margin),
         form.priceRoundingStep,
       ),
       _batchLocked: false,
@@ -969,8 +1042,18 @@ function SOFormModal({ order, onClose, onSaved }) {
                 <Package size={12} /> Mutasi stok OUT otomatis
               </span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-gray-600">Margin Harga Jual (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.margin}
+                  onChange={(e) => setForm((p) => ({ ...p, margin: Number(e.target.value) }))}
+                  className="w-24 px-3 py-1.5 rounded-lg border border-gray-300 text-xs text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
+                />
+              </div>
+              <div className="flex flex-col sm:items-end gap-2">
                 <label className="text-xs font-medium text-gray-600">Pembulatan Harga Jual</label>
                 <select
                   value={form.priceRoundingStep}
@@ -985,15 +1068,15 @@ function SOFormModal({ order, onClose, onSaved }) {
                   <option value={500}>Kelipatan 500</option>
                   <option value={1000}>Kelipatan 1000</option>
                 </select>
+                <button
+                  type="button"
+                  onClick={roundAllUnitPrices}
+                  disabled={!form.priceRoundingStep}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Bulatkan Semua Harga
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={roundAllUnitPrices}
-                disabled={!form.priceRoundingStep}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Bulatkan Semua Harga
-              </button>
             </div>
             <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3 mb-3">
               <p className="text-xs text-cyan-800">
@@ -1019,7 +1102,6 @@ function SOFormModal({ order, onClose, onSaved }) {
                       <th className="text-left px-4 py-2.5 font-medium text-gray-600">Produk</th>
                       <th className="text-left px-4 py-2.5 font-medium text-gray-600 w-24">Satuan</th>
                       <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-28">Qty</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Margin %</th>
                       <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Harga Jual</th>
                       <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-20">Disc %</th>
                       <th className="text-right px-4 py-2.5 font-medium text-gray-600 w-32">Subtotal</th>
@@ -1131,16 +1213,6 @@ function SOFormModal({ order, onClose, onSaved }) {
                             <input
                               type="number"
                               min="0"
-                              value={item.margin ?? 0}
-                              onChange={(e) => handleItemChange(idx, 'margin', Number(e.target.value))}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm text-right focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                              placeholder="0"
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 align-top">
-                            <input
-                              type="number"
-                              min="0"
                               value={item.unitPrice}
                               onChange={(e) => handleItemChange(idx, 'unitPrice', Number(e.target.value))}
                               onBlur={() => roundItemUnitPrice(idx)}
@@ -1215,17 +1287,17 @@ function SOFormModal({ order, onClose, onSaved }) {
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200 bg-gray-50/50">
-                      <td colSpan={7} className="px-4 py-2.5 text-right text-sm text-gray-600">Subtotal</td>
+                      <td colSpan={6} className="px-4 py-2.5 text-right text-sm text-gray-600">Subtotal</td>
                       <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(subtotal)}</td>
                       <td></td>
                     </tr>
                     <tr className="bg-gray-50/50">
-                      <td colSpan={7} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({isPkp ? ppnRate : 0}%)</td>
+                      <td colSpan={6} className="px-4 py-2.5 text-right text-sm text-gray-600">PPN ({isPkp ? ppnRate : 0}%)</td>
                       <td className="px-4 py-2.5 text-right font-medium text-gray-900">{formatCurrency(ppnAmount)}</td>
                       <td></td>
                     </tr>
                     <tr className="border-t border-gray-300 bg-gray-50/50">
-                      <td colSpan={7} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
+                      <td colSpan={6} className="px-4 py-3 text-right font-semibold text-gray-700">Grand Total</td>
                       <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">{formatCurrency(grandTotal)}</td>
                       <td></td>
                     </tr>
@@ -1279,10 +1351,12 @@ function SOFormModal({ order, onClose, onSaved }) {
 /* ═══════════════════════════════════════
    SO DETAIL MODAL
    ═══════════════════════════════════════ */
-function SODetailModal({ order, onClose }) {
+function SODetailModal({ order, onClose, onPrintOrder, onPrintInvoice }) {
   const normalizedStatus = normalizeSOStatus(order.status);
   const st = STATUS_MAP[normalizedStatus] || STATUS_MAP.shipped;
   const { isPkp, ppnRate, calculatePpn } = useSettings();
+  const canPrintOrder = normalizedStatus === 'shipped';
+  const canPrintInvoice = normalizedStatus === 'awaiting_payment';
 
   const subtotal = (order.items || []).reduce((sum, item) => {
     const s = (item.quantity || 0) * (item.unitPrice || 0);
@@ -1314,9 +1388,29 @@ function SODetailModal({ order, onClose }) {
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {canPrintOrder && (
+                <button
+                  onClick={() => onPrintOrder?.(order)}
+                  className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                  title="Cetak Surat Penyerahan"
+                >
+                  <Printer size={18} />
+                </button>
+              )}
+              {canPrintInvoice && (
+                <button
+                  onClick={() => onPrintInvoice?.(order)}
+                  className="p-2 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors"
+                  title="Cetak Invoice"
+                >
+                  <FileText size={18} />
+                </button>
+              )}
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1564,7 +1658,7 @@ function emptyItem() {
     batchNumber: '',
     expiryDate: '',
     unitPrice: 0,
-    margin: 20,
+    margin: 1,
     discount: 0,
     notes: '',
   };
@@ -1586,13 +1680,6 @@ function calculateSellingPriceFromMargin(basePrice, marginPercent) {
   const base = Number(basePrice || 0);
   const margin = Number(marginPercent || 0);
   return Math.max(0, base * (1 + (margin / 100)));
-}
-
-function calculateMarginFromSellingPrice(basePrice, sellingPrice) {
-  const base = Number(basePrice || 0);
-  const selling = Number(sellingPrice || 0);
-  if (base <= 0) return 0;
-  return Number((((selling - base) / base) * 100).toFixed(2));
 }
 
 function applyPriceRounding(price, step) {

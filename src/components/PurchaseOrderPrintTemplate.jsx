@@ -1,5 +1,6 @@
 import React from 'react';
 import useSettings from '../hooks/useSettings';
+import env from '../config/env';
 
 export default function PurchaseOrderPrintTemplate({ order }) {
   const { company } = useSettings();
@@ -17,7 +18,7 @@ export default function PurchaseOrderPrintTemplate({ order }) {
 
   const co = {
     name: company.name || 'PBF',
-    logo: company.logo || null,
+    logo: normalizeLogoSrc(company.logo),
     addrLine1,
     addrLine2,
     address: companyAddress || '-',
@@ -157,6 +158,19 @@ export default function PurchaseOrderPrintTemplate({ order }) {
       </div>
     </div>
   );
+}
+
+function normalizeLogoSrc(rawLogo) {
+  if (!rawLogo) return null;
+  if (rawLogo.startsWith('data:') || rawLogo.startsWith('blob:')) return rawLogo;
+  if (/^(https?:)?\/\//i.test(rawLogo)) return rawLogo;
+
+  const apiOrigin = new URL(env.API_BASE_URL).origin;
+  if (rawLogo.startsWith('/uploads/')) return `${apiOrigin}${rawLogo}`;
+  if (rawLogo.startsWith('uploads/')) return `${apiOrigin}/${rawLogo}`;
+  if (rawLogo.startsWith('/api/v1/uploads/')) return `${apiOrigin}${rawLogo.replace('/api/v1', '')}`;
+  if (rawLogo.startsWith('api/v1/uploads/')) return `${apiOrigin}/${rawLogo.replace('api/v1/', '')}`;
+  return rawLogo;
 }
 
 function fmtDate(dateStr) {

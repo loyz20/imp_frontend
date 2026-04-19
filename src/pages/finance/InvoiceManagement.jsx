@@ -420,7 +420,11 @@ function InvoiceDetailModal({ invoice, onClose, onPrint }) {
   const deliveryLabel = d.invoiceType === 'purchase' ? 'No. Penerimaan' : 'No. Delivery';
   const referenceValue = d.invoiceType === 'purchase'
     ? (d.purchaseOrder?.poNumber || d.poNumber || d.purchaseOrderId || '-')
-    : (d.salesOrder?.soNumber || d.soNumber || '-');
+    : (d.salesOrder?.soNumber
+      || d.soNumber
+      || (Array.isArray(d.salesOrderNumbers) && d.salesOrderNumbers.length ? d.salesOrderNumbers.join(', ') : '')
+      || (Array.isArray(d.salesOrderIds) && d.salesOrderIds.length ? d.salesOrderIds.join(', ') : '')
+      || '-');
   const deliveryValue = d.invoiceType === 'purchase'
     ? (d.goodsReceiving?.receivingNumber || d.receiving?.receivingNumber || d.goodsReceivingId || '-')
     : (d.delivery?.deliveryNumber || d.deliveryNumber || '-');
@@ -612,7 +616,11 @@ function getPrimaryReference(inv) {
   if (inv.invoiceType === 'purchase') {
     return inv.purchaseOrder?.poNumber || inv.poNumber || inv.purchaseOrderId || '-';
   }
-  return inv.salesOrder?.soNumber || inv.soNumber || '-';
+  return inv.salesOrder?.soNumber
+    || inv.soNumber
+    || (Array.isArray(inv.salesOrderNumbers) && inv.salesOrderNumbers.length ? inv.salesOrderNumbers.join(', ') : '')
+    || (Array.isArray(inv.salesOrderIds) && inv.salesOrderIds.length ? inv.salesOrderIds.join(', ') : '')
+    || '-';
 }
 
 function getSecondaryReference(inv) {

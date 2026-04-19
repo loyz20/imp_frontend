@@ -5,6 +5,8 @@ const STATUS_LABELS = {
   packed: 'Dikemas',
   partial_delivered: 'Terkirim Sebagian',
   delivered: 'Terkirim',
+  awaiting_payment: 'Menunggu Pembayaran',
+  paid: 'Lunas',
   returned: 'Diretur',
   canceled: 'Dibatalkan',
   cancelled: 'Dibatalkan',
@@ -62,7 +64,7 @@ export default function SalesReportPrintTemplate({ payload }) {
           <thead>
             <tr>
               <th className="invoice-th invoice-th-no">No</th>
-              <th className="invoice-th">No. SO</th>
+              <th className="invoice-th">No. Surat Jalan</th>
               <th className="invoice-th">Pelanggan</th>
               <th className="invoice-th">Tanggal</th>
               <th className="invoice-th invoice-th-price">Total</th>
@@ -73,7 +75,7 @@ export default function SalesReportPrintTemplate({ payload }) {
             {rows.length ? rows.map((row, idx) => (
               <tr key={row._id || row.id || idx} className="invoice-tr">
                 <td className="invoice-td invoice-td-center">{idx + 1}</td>
-                <td className="invoice-td">{row.soNumber || '-'}</td>
+                <td className="invoice-td">{row.deliveryNumber || row.invoiceNumber || row.soNumber || '-'}</td>
                 <td className="invoice-td">{row.customer?.name || '-'}</td>
                 <td className="invoice-td">{fmtDate(row.orderDate || row.createdAt)}</td>
                 <td className="invoice-td invoice-td-right">{fmtCurrency(row.totalAmount || 0)}</td>
@@ -119,8 +121,14 @@ function normalizeSOStatus(status) {
     confirmed: 'packed',
     processing: 'packed',
     ready_to_ship: 'packed',
+    partial_delivery: 'partial_delivered',
     partial_shipped: 'partial_delivered',
+    invoiced: 'awaiting_payment',
+    waiting_payment: 'awaiting_payment',
+    pending_payment: 'awaiting_payment',
+    awaiting_payment: 'awaiting_payment',
     shipped: 'delivered',
+    paid: 'paid',
     completed: 'delivered',
     cancelled: 'canceled',
   };

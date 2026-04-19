@@ -5,7 +5,7 @@ import Pagination from '../../components/Pagination';
 import toast from 'react-hot-toast';
 import {
   Download, Upload, Plus, Eye, SquarePen, Trash2, X, Check, AlertCircle,
-  Hash, QrCode, ChevronDown, ChevronLeft, ChevronRight, ShieldCheck,
+  QrCode, ChevronDown, ChevronLeft, ChevronRight, ShieldCheck,
   FileText, FlaskConical, SlidersHorizontal, Pencil,
   Package, ArrowRight, AlertTriangle, Ban, CheckCircle, CircleAlert,
   Loader2, PlusCircle, RefreshCw, Info,
@@ -600,34 +600,20 @@ function ProductFormModal({ product, onClose, onSaved }) {
                   )}
                 </div>
 
-                {/* Kode Produk & Barcode */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1.5">
-                      <Hash size={14} className="text-gray-400" />
-                      Kode Produk
-                    </label>
-                    <input
-                      type="text"
-                      name="sku"
-                      value={form.sku}
-                      readOnly
-                      placeholder={form.category === 'obat' ? 'Auto: F0001' : 'Auto: A0001'}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-500 cursor-not-allowed"
-                    />
-                    <p className="text-xs text-gray-500 mt-1.5">
-                      Dibuat otomatis oleh backend saat produk disimpan.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1.5">
-                      <QrCode size={14} className="text-gray-400" />
-                      Barcode
-                    </label>
-                    <input type="text" name="barcode" value={form.barcode} onChange={handleChange}
-                      placeholder="Scan atau input manual"
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" />
-                  </div>
+                {/* Barcode */}
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1.5">
+                    <QrCode size={14} className="text-gray-400" />
+                    Barcode
+                  </label>
+                  <input
+                    type="text"
+                    name="barcode"
+                    value={form.barcode}
+                    onChange={handleChange}
+                    placeholder="Scan atau input manual"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                  />
                 </div>
 
                 {/* Kategori & Golongan */}

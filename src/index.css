@@ -503,4 +503,264 @@
     font-weight: 700;
     text-decoration: underline;
   }
+
+  /* ── Sales Order Letter (delivery note format) ── */
+  .so-letter-page {
+    font-family: 'Times New Roman', serif;
+    font-size: 11pt;
+    color: #111;
+    line-height: 1.35;
+  }
+  .so-letter-head {
+    margin-bottom: 10px;
+  }
+  .so-letter-head-row {
+    font-size: 9.5pt;
+  }
+  .so-letter-logo-img {
+    max-height: 72px;
+    max-width: 80px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .so-letter-company {
+    font-size: 16.5pt;
+  }
+  .so-letter-head-line {
+    font-size: 9.5pt;
+  }
+  .so-letter-title-wrap {
+    margin: 10px 0 12px;
+  }
+  .so-letter-title {
+    font-size: 15.5pt;
+    letter-spacing: 0.3px;
+  }
+  .so-letter-top-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .so-letter-recipient {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .so-letter-doc-meta {
+    flex: 0 0 300px;
+    font-size: 10pt;
+    line-height: 1.55;
+  }
+  .so-letter-doc-meta p {
+    margin: 0;
+    display: flex;
+    gap: 6px;
+  }
+  .so-letter-meta-label {
+    min-width: 150px;
+    white-space: nowrap;
+  }
+  .so-letter-meta-sep {
+    width: 8px;
+    flex-shrink: 0;
+  }
+  .so-letter-open {
+    margin: 8px 0 8px;
+  }
+  .so-letter-table {
+    table-layout: fixed;
+  }
+  .so-col-no {
+    width: 6%;
+  }
+  .so-col-name {
+    width: 44%;
+  }
+  .so-col-qty {
+    width: 12%;
+  }
+  .so-col-unit {
+    width: 12%;
+  }
+  .so-col-batch {
+    width: 13%;
+  }
+  .so-col-expiry {
+    width: 13%;
+  }
+  .so-letter-notes {
+    min-height: 44px;
+  }
+  .so-letter-signatures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+    margin-top: 24px;
+  }
+  .so-sign-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    font-size: 10pt;
+    min-height: 180px;
+  }
+  .so-sign-block > p {
+    margin: 0;
+  }
+  .so-sign-block-right {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .so-sign-line {
+    width: 85%;
+    height: 74px;
+    border-bottom: 1px solid #333;
+    margin: 18px 0 6px;
+  }
+  .so-sign-name {
+    font-weight: 700;
+    min-height: 18px;
+  }
+  .so-sign-desc {
+    font-size: 9pt;
+    min-height: 16px;
+  }
+  .so-letter-location-date {
+    text-align: right;
+    margin-top: 10px;
+    font-size: 10pt;
+  }
+
+  /* ── Sales Order Letter (delivery note format) ── */
+  .so-letter-page {
+    font-family: 'Times New Roman', serif;
+    font-size: 11pt;
+    color: #111;
+    line-height: 1.35;
+  }
+  .so-letter-head {
+    margin-bottom: 10px;
+  }
+  .so-letter-head-row {
+    font-size: 9.5pt;
+  }
+  .so-letter-logo-img {
+    max-height: 72px;
+    max-width: 80px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .so-letter-company {
+    font-size: 16.5pt;
+  }
+  .so-letter-head-line {
+    font-size: 9.5pt;
+  }
+  .so-letter-title-wrap {
+    margin: 10px 0 12px;
+  }
+  .so-letter-title {
+    font-size: 15.5pt;
+    letter-spacing: 0.3px;
+  }
+  .so-letter-top-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .so-letter-recipient {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .so-letter-doc-meta {
+    flex: 0 0 300px;
+    font-size: 10pt;
+    line-height: 1.55;
+  }
+  .so-letter-doc-meta p {
+    margin: 0;
+    display: flex;
+    gap: 6px;
+  }
+  .so-letter-meta-label {
+    min-width: 150px;
+    white-space: nowrap;
+  }
+  .so-letter-meta-sep {
+    width: 8px;
+    flex-shrink: 0;
+  }
+  .so-letter-open {
+    margin: 8px 0 8px;
+  }
+  .so-letter-table {
+    table-layout: fixed;
+  }
+  .so-col-no {
+    width: 6%;
+  }
+  .so-col-name {
+    width: 44%;
+  }
+  .so-col-qty {
+    width: 12%;
+  }
+  .so-col-unit {
+    width: 12%;
+  }
+  .so-col-batch {
+    width: 13%;
+  }
+  .so-col-expiry {
+    width: 13%;
+  }
+  .so-letter-notes {
+    min-height: 44px;
+  }
+  .so-letter-signatures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+    margin-top: 24px;
+  }
+  .so-sign-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    font-size: 10pt;
+    min-height: 180px;
+  }
+  .so-sign-block > p {
+    margin: 0;
+  }
+  .so-sign-block-right {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .so-sign-line {
+    width: 85%;
+    height: 74px;
+    border-bottom: 1px solid #333;
+    margin: 18px 0 6px;
+  }
+  .so-sign-name {
+    font-weight: 700;
+    min-height: 18px;
+  }
+  .so-sign-desc {
+    font-size: 9pt;
+    min-height: 16px;
+  }
+  .so-letter-location-date {
+    text-align: right;
+    margin-top: 10px;
+    font-size: 10pt;
+  }
 }

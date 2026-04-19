@@ -43,6 +43,7 @@ export default function PurchaseOrder() {
   const userRole = currentUser?.role || '';
   const { getDocPrefix } = useSettings();
   const poPrefix = getDocPrefix('purchaseOrder');
+  const todayIso = getTodayISODate();
 
   const canCrud = CAN_CRUD_ROLES.includes(userRole);
   const canDelete = CAN_DELETE_ROLES.includes(userRole);
@@ -52,6 +53,17 @@ export default function PurchaseOrder() {
   const [showDetail, setShowDetail] = useState(null);
   const [printOrder, setPrintOrder] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [filterDateDrafts, setFilterDateDrafts] = useState({
+    dateFrom: formatDateInputDDMMYYYY(filters.dateFrom || todayIso),
+    dateTo: formatDateInputDDMMYYYY(filters.dateTo || todayIso),
+  });
+
+  useEffect(() => {
+    setFilterDateDrafts({
+      dateFrom: formatDateInputDDMMYYYY(filters.dateFrom || todayIso),
+      dateTo: formatDateInputDDMMYYYY(filters.dateTo || todayIso),
+    });
+  }, [filters.dateFrom, filters.dateTo, todayIso]);
 
   useEffect(() => {
     fetchOrders();
@@ -62,6 +74,30 @@ export default function PurchaseOrder() {
     () => debounce((value) => setFilters({ search: value }), 400),
     [setFilters],
   );
+
+  const handleFilterDateDraftChange = (key, value) => {
+    setFilterDateDrafts((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const commitFilterDateDraft = (key) => {
+    const rawValue = filterDateDrafts[key] ?? '';
+    if (!rawValue.trim()) {
+      setFilters({ [key]: '', page: 1 });
+      return;
+    }
+
+    const isoValue = parseDateInputDDMMYYYY(rawValue);
+    if (!isoValue) {
+      toast.error('Format tanggal harus DD/MM/YYYY');
+      setFilterDateDrafts((prev) => ({
+        ...prev,
+        [key]: formatDateInputDDMMYYYY(filters[key] || todayIso),
+      }));
+      return;
+    }
+
+    setFilters({ [key]: isoValue, page: 1 });
+  };
 
   const openCreate = () => { setEditingOrder(null); setShowForm(true); };
   const openEdit = (order) => { setEditingOrder(order); setShowForm(true); };
@@ -175,18 +211,22 @@ export default function PurchaseOrder() {
             ))}
           </select>
           <input
-            type="date"
-            value={filters.dateFrom}
-            onChange={(e) => setFilters({ dateFrom: e.target.value })}
+            type="text"
+            inputMode="numeric"
+            value={filterDateDrafts.dateFrom}
+            onChange={(e) => handleFilterDateDraftChange('dateFrom', e.target.value)}
+            onBlur={() => commitFilterDateDraft('dateFrom')}
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
-            placeholder="Dari tanggal"
+            placeholder="DD/MM/YYYY"
           />
           <input
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => setFilters({ dateTo: e.target.value })}
+            type="text"
+            inputMode="numeric"
+            value={filterDateDrafts.dateTo}
+            onChange={(e) => handleFilterDateDraftChange('dateTo', e.target.value)}
+            onBlur={() => commitFilterDateDraft('dateTo')}
             className="px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition bg-white"
-            placeholder="Sampai tanggal"
+            placeholder="DD/MM/YYYY"
           />
           <select
             value={filters.sort}
@@ -207,7 +247,7 @@ export default function PurchaseOrder() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. PO</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. Pemesanan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Supplier</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tanggal</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Total Item</th>
@@ -354,13 +394,14 @@ function POFormModal({ order, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const hasExistingPricing = (order?.items || []).some((item) => Number(item?.unitPrice || 0) > 0 || Number(item?.discount || 0) > 0);
   const hasExistingPpn = Number(order?.ppnAmount || 0) > 0 || Number(order?.ppnRate || 0) > 0;
+  const todayIso = getTodayISODate();
 
   const [form, setForm] = useState({
     poNumber: order?.poNumber || '',
     supplierId: resolveSupplierIdStr(order),
     supplierName: resolveSupplier(order)?.name || '',
-    orderDate: order?.orderDate ? order.orderDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
-    expectedDeliveryDate: order?.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : '',
+    orderDate: order?.orderDate ? order.orderDate.slice(0, 10) : todayIso,
+    expectedDeliveryDate: order?.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : todayIso,
     paymentTermDays: order?.paymentTermDays ?? defaultPaymentTermDays ?? 30,
     enablePricing: hasExistingPricing,
     enablePpn: hasExistingPpn,
@@ -379,6 +420,18 @@ function POFormModal({ order, onClose, onSaved }) {
         }))
       : [emptyItem()],
   });
+
+  const [dateDrafts, setDateDrafts] = useState({
+    orderDate: formatDateInputDDMMYYYY(form.orderDate),
+    expectedDeliveryDate: formatDateInputDDMMYYYY(form.expectedDeliveryDate),
+  });
+
+  useEffect(() => {
+    setDateDrafts({
+      orderDate: formatDateInputDDMMYYYY(form.orderDate),
+      expectedDeliveryDate: formatDateInputDDMMYYYY(form.expectedDeliveryDate),
+    });
+  }, [form.orderDate, form.expectedDeliveryDate]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -424,6 +477,30 @@ function POFormModal({ order, onClose, onSaved }) {
     ? Math.round(subtotalAmount * Number(form.ppnRate || 0) / 100)
     : 0;
   const grandTotal = subtotalAmount + calculatedPpnAmount;
+
+  const handleDateDraftChange = (key, value) => {
+    setDateDrafts((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const commitDateDraft = (key) => {
+    const rawValue = dateDrafts[key] ?? '';
+    if (!rawValue.trim()) {
+      setForm((p) => ({ ...p, [key]: '' }));
+      return;
+    }
+
+    const isoValue = parseDateInputDDMMYYYY(rawValue);
+    if (!isoValue) {
+      toast.error('Format tanggal harus DD/MM/YYYY');
+      setDateDrafts((prev) => ({
+        ...prev,
+        [key]: formatDateInputDDMMYYYY(form[key]),
+      }));
+      return;
+    }
+
+    setForm((p) => ({ ...p, [key]: isoValue }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -545,22 +622,26 @@ function POFormModal({ order, onClose, onSaved }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal PO *</label>
               <input
-                type="date"
-                name="orderDate"
-                value={form.orderDate}
-                onChange={handleChange}
+                type="text"
+                inputMode="numeric"
+                value={dateDrafts.orderDate}
+                onChange={(e) => handleDateDraftChange('orderDate', e.target.value)}
+                onBlur={() => commitDateDraft('orderDate')}
                 required
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                placeholder="DD/MM/YYYY"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Estimasi Pengiriman</label>
               <input
-                type="date"
-                name="expectedDeliveryDate"
-                value={form.expectedDeliveryDate}
-                onChange={handleChange}
+                type="text"
+                inputMode="numeric"
+                value={dateDrafts.expectedDeliveryDate}
+                onChange={(e) => handleDateDraftChange('expectedDeliveryDate', e.target.value)}
+                onBlur={() => commitDateDraft('expectedDeliveryDate')}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                placeholder="DD/MM/YYYY"
               />
             </div>
             <div>
@@ -1209,4 +1290,46 @@ function debounce(fn, ms) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
+}
+
+function getTodayISODate() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateInputDDMMYYYY(value) {
+  if (!value) return '';
+
+  const str = String(value).trim();
+  const datePart = str.includes('T') ? str.split('T')[0] : str;
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(datePart)) return datePart;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return '';
+
+  const [year, month, day] = datePart.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateInputDDMMYYYY(value) {
+  if (!value) return '';
+
+  const text = String(value).trim();
+  const m = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  const valid =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+  if (!valid) return null;
+
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }

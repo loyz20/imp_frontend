@@ -352,13 +352,14 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
   const [form, setForm] = useState({
     // Identitas
     name: customer?.name || '',
-    code: customer?.code || '',
     type: customer?.type || 'apotek',
     ownerName: customer?.ownerName || '',
     ownerAddress: customer?.ownerAddress || '',
     // Kontak
     contactPerson: customer?.contactPerson || '',
     phone: customer?.phone || '',
+    eReportCode: customer?.eReportCode || '',
+    bpomCode: customer?.bpomCode || '',
     // Alamat
     address: {
       street: customer?.address?.street || '',
@@ -396,6 +397,18 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
     isActive: customer?.isActive ?? true,
   });
 
+  const [dateDrafts, setDateDrafts] = useState({
+    izinSaranaExpiry: formatDateInputDDMMYYYY(form.izinSarana.expiryDate),
+    sipaExpiry: formatDateInputDDMMYYYY(form.sipa.expiryDate),
+  });
+
+  useEffect(() => {
+    setDateDrafts({
+      izinSaranaExpiry: formatDateInputDDMMYYYY(form.izinSarana.expiryDate),
+      sipaExpiry: formatDateInputDDMMYYYY(form.sipa.expiryDate),
+    });
+  }, [form.izinSarana.expiryDate, form.sipa.expiryDate]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((p) => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
@@ -406,6 +419,30 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
       ...p,
       [parent]: { ...p[parent], [field]: value },
     }));
+  };
+
+  const handleDateDraftChange = (key, value) => {
+    setDateDrafts((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const commitDateDraft = (key, parent, field) => {
+    const rawValue = dateDrafts[key] ?? '';
+    if (!rawValue.trim()) {
+      handleNestedChange(parent, field, '');
+      return;
+    }
+
+    const isoValue = parseDateInputDDMMYYYY(rawValue);
+    if (!isoValue) {
+      toast.error('Format tanggal harus DD/MM/YYYY');
+      setDateDrafts((prev) => ({
+        ...prev,
+        [key]: formatDateInputDDMMYYYY(form[parent]?.[field]),
+      }));
+      return;
+    }
+
+    handleNestedChange(parent, field, isoValue);
   };
 
   const handleSubmit = async (e) => {
@@ -436,6 +473,8 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
         ownerAddress: toOptionalText(form.ownerAddress),
         contactPerson: toOptionalText(form.contactPerson),
         phone: toOptionalText(form.phone),
+        eReportCode: toOptionalText(form.eReportCode),
+        bpomCode: toOptionalText(form.bpomCode),
         address: {
           street: toOptionalText(form.address?.street),
           city: toOptionalText(form.address?.city),
@@ -536,17 +575,6 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode Pelanggan</label>
-                  <input
-                    name="code"
-                    value={form.code}
-                    readOnly
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm outline-none"
-                    placeholder="Auto-generate backend (C0001)"
-                  />
-                  <p className="text-xs text-gray-500 mt-1.5">Kode pelanggan dibuat otomatis oleh backend.</p>
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipe Pelanggan</label>
                   <select
                     name="type"
@@ -559,16 +587,16 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                     ))}
                   </select>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Pemilik</label>
-                <input
-                  name="ownerName"
-                  value={form.ownerName}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
-                  placeholder="Nama pemilik customer"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Pemilik</label>
+                  <input
+                    name="ownerName"
+                    value={form.ownerName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    placeholder="Nama pemilik customer"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Alamat Pemilik</label>
@@ -590,6 +618,28 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                   placeholder="XX.XXX.XXX.X-XXX.XXX"
                 />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode E-Report</label>
+                  <input
+                    name="eReportCode"
+                    value={form.eReportCode}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    placeholder="Kode E-Report customer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Kode BPOM</label>
+                  <input
+                    name="bpomCode"
+                    value={form.bpomCode}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                    placeholder="Kode BPOM customer"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama NPWP</label>
@@ -719,9 +769,12 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired</label>
                     <input
-                      type="date"
-                      value={form.izinSarana.expiryDate}
-                      onChange={(e) => handleNestedChange('izinSarana', 'expiryDate', e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={dateDrafts.izinSaranaExpiry}
+                      onChange={(e) => handleDateDraftChange('izinSaranaExpiry', e.target.value)}
+                      onBlur={() => commitDateDraft('izinSaranaExpiry', 'izinSarana', 'expiryDate')}
+                      placeholder="DD/MM/YYYY"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
@@ -764,9 +817,12 @@ function CustomerFormModal({ customer, requireSIA, defaultCreditLimit, onClose, 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Tanggal Expired SIPA</label>
                     <input
-                      type="date"
-                      value={form.sipa.expiryDate}
-                      onChange={(e) => handleNestedChange('sipa', 'expiryDate', e.target.value)}
+                      type="text"
+                      inputMode="numeric"
+                      value={dateDrafts.sipaExpiry}
+                      onChange={(e) => handleDateDraftChange('sipaExpiry', e.target.value)}
+                      onBlur={() => commitDateDraft('sipaExpiry', 'sipa', 'expiryDate')}
+                      placeholder="DD/MM/YYYY"
                       className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
                     />
                   </div>
@@ -1006,6 +1062,8 @@ function CustomerDetailModal({ customer, onClose }) {
               <InfoRow label="Tipe" value={TYPE_LABELS[customer.type] || customer.type} icon={Users} />
               <InfoRow label="Nama Pemilik" value={customer.ownerName} icon={User} />
               <InfoRow label="Alamat Pemilik" value={customer.ownerAddress} icon={MapPin} />
+              <InfoRow label="Kode E-Report" value={customer.eReportCode} icon={FileText} />
+              <InfoRow label="Kode BPOM" value={customer.bpomCode} icon={FileText} />
               <InfoRow label="NPWP" value={customer.npwp} icon={FileText} />
               <InfoRow label="Nama NPWP" value={customer.npwpName} icon={FileText} />
               <InfoRow label="Alamat NPWP" value={customer.npwpAddress} icon={MapPin} />
@@ -1188,4 +1246,44 @@ function debounce(fn, ms) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
+}
+
+function formatDateInputDDMMYYYY(value) {
+  if (!value) return '';
+
+  const str = String(value).trim();
+  const datePart = str.includes('T') ? str.split('T')[0] : str;
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(datePart)) {
+    return datePart;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return '';
+  }
+
+  const [year, month, day] = datePart.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateInputDDMMYYYY(value) {
+  if (!value) return '';
+
+  const text = String(value).trim();
+  const m = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  const valid =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+
+  if (!valid) return null;
+
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }

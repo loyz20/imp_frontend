@@ -5,7 +5,7 @@ import FinanceReportPrintTemplate from '../../components/FinanceReportPrintTempl
 import toast from 'react-hot-toast';
 import { Loader2, DollarSign, TrendingUp, TrendingDown, Percent } from 'lucide-react';
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 
@@ -46,6 +46,17 @@ export default function FinanceReport() {
 
   const pl = financeData?.profitLoss;
   const cashflow = financeData?.cashFlow;
+  const isDenseTick = ['daily', 'weekly', 'custom'].includes(filters.period);
+  const xAxisProps = {
+    dataKey: 'label',
+    tick: { fontSize: 12 },
+    stroke: '#9ca3af',
+    minTickGap: isDenseTick ? 8 : 24,
+    angle: isDenseTick ? -30 : 0,
+    textAnchor: isDenseTick ? 'end' : 'middle',
+    height: isDenseTick ? 56 : 36,
+    interval: 'preserveStartEnd',
+  };
 
   return (
     <div className="space-y-6">
@@ -99,8 +110,13 @@ export default function FinanceReport() {
             <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={financeChart?.trend || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" tickFormatter={(v) => `${(v / 1000000).toFixed(0)}jt`} />
+                  <XAxis {...xAxisProps} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    stroke="#9ca3af"
+                    width={72}
+                    tickFormatter={(v) => formatAxisCurrency(v)}
+                  />
                   <Tooltip formatter={(v) => formatCurrency(v)} />
                   <Legend />
                   <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Pendapatan" />
@@ -115,10 +131,19 @@ export default function FinanceReport() {
             <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={financeChart?.profitTrend || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#9ca3af" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" tickFormatter={(v) => `${(v / 1000000).toFixed(0)}jt`} />
+                  <XAxis {...xAxisProps} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    stroke="#9ca3af"
+                    width={72}
+                    tickFormatter={(v) => formatAxisCurrency(v)}
+                  />
                   <Tooltip formatter={(v) => formatCurrency(v)} />
-                  <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name="Laba Bersih" />
+                  <Bar dataKey="profit" radius={[4, 4, 0, 0]} name="Laba Bersih">
+                    {(financeChart?.profitTrend || []).map((item, index) => (
+                      <Cell key={`profit-cell-${index}`} fill={(item?.profit ?? 0) < 0 ? '#ef4444' : '#10b981'} />
+                    ))}
+                  </Bar>
                 </BarChart>
             </ResponsiveContainer>
           </div>
@@ -223,4 +248,21 @@ function CashRow({ label, inflow, outflow, net }) {
 function formatCurrency(v) {
   if (v == null) return 'Rp 0';
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
+}
+
+function formatAxisCurrency(v) {
+  const n = Number(v || 0);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+
+  if (abs >= 1000000000) {
+    return `${sign}${(abs / 1000000000).toFixed(abs >= 10000000000 ? 0 : 1)}m`;
+  }
+  if (abs >= 1000000) {
+    return `${sign}${(abs / 1000000).toFixed(abs >= 10000000 ? 0 : 1)}jt`;
+  }
+  if (abs >= 1000) {
+    return `${sign}${(abs / 1000).toFixed(abs >= 100000 ? 0 : 1)}rb`;
+  }
+  return `${sign}${abs.toFixed(0)}`;
 }

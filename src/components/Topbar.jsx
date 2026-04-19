@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Search, Bell, ChevronDown, User, Settings, LogOut } from 'lucide-react';
 import useAuthStore from '../store/authStore';
+import useSettingsStore from '../store/settingsStore';
 import useNotificationStore from '../store/notificationStore';
 import NotificationPanel from './NotificationPanel';
 
@@ -9,10 +10,34 @@ export default function Topbar({ onMenuToggle }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { unreadCount, togglePanel } = useNotificationStore();
+  const settings = useSettingsStore((s) => s.settings);
+  const fetchSection = useSettingsStore((s) => s.fetchSection);
+  const isCompanyLoading = useSettingsStore((s) => s.sectionLoading?.company);
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const retriedMissingLogoRef = useRef(false);
   const profileRef = useRef(null);
   const notifRef = useRef(null);
+  const companyName = settings?.company?.name || 'SI-PBF';
+
+  useEffect(() => {
+    const company = settings?.company;
+
+    if (!company && !isCompanyLoading) {
+      fetchSection('company');
+      return;
+    }
+
+    if (company?.logo) {
+      retriedMissingLogoRef.current = false;
+      return;
+    }
+
+    if (company && !company.logo && !retriedMissingLogoRef.current && !isCompanyLoading) {
+      retriedMissingLogoRef.current = true;
+      fetchSection('company');
+    }
+  }, [settings?.company, isCompanyLoading, fetchSection]);
 
   // Close profile dropdown on outside click
   useEffect(() => {
@@ -47,6 +72,11 @@ export default function Topbar({ onMenuToggle }) {
           >
             <Menu className="w-5 h-5" strokeWidth={2} />
           </button>
+
+          {/* Company brand */}
+          <div className="hidden lg:flex items-center gap-2.5 pr-3 mr-1 border-r border-gray-200 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate max-w-56">{companyName}</p>
+          </div>
 
           {/* Search bar */}
           <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all w-64 lg:w-80">

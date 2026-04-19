@@ -72,6 +72,9 @@ const financeService = {
   getInvoiceById: (id) =>
     apiClient.get(`/finance/invoices/${id}`),
 
+  getInvoiceByNumber: (invoiceNumber) =>
+    apiClient.get('/finance/invoices/by-number', { params: { invoiceNumber } }),
+
   sendInvoice: (id) =>
     apiClient.patch(`/finance/invoices/${id}/send`),
 

@@ -17,6 +17,8 @@ const STATUS_COLORS = {
   packed: 'bg-blue-50 text-blue-700',
   partial_delivered: 'bg-purple-50 text-purple-700',
   delivered: 'bg-emerald-50 text-emerald-700',
+  awaiting_payment: 'bg-amber-50 text-amber-700',
+  paid: 'bg-green-50 text-green-700',
   returned: 'bg-orange-50 text-orange-700',
   canceled: 'bg-red-50 text-red-600',
   cancelled: 'bg-red-50 text-red-600',
@@ -26,6 +28,8 @@ const STATUS_LABELS = {
   packed: 'Dikemas',
   partial_delivered: 'Terkirim Sebagian',
   delivered: 'Terkirim',
+  awaiting_payment: 'Menunggu Pembayaran',
+  paid: 'Lunas',
   returned: 'Diretur',
   canceled: 'Dibatalkan',
   cancelled: 'Dibatalkan',
@@ -221,7 +225,7 @@ export default function SalesReport() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. SO</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600">No. Surat Jalan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600">Pelanggan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Tanggal</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600">Total</th>
@@ -242,7 +246,7 @@ export default function SalesReport() {
               ) : (
                 salesData.map((row) => (
                   <tr key={oid(row)} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-5 py-3.5 font-medium text-gray-900">{row.soNumber}</td>
+                    <td className="px-5 py-3.5 font-medium text-gray-900">{row.deliveryNumber || row.invoiceNumber || row.soNumber || '-'}</td>
                     <td className="px-5 py-3.5 text-gray-600">{row.customer?.name || '-'}</td>
                     <td className="px-5 py-3.5 text-gray-500 hidden md:table-cell">{formatDate(row.orderDate || row.createdAt)}</td>
                     <td className="px-5 py-3.5 text-right font-medium text-gray-900">{formatCurrency(row.totalAmount)}</td>
@@ -290,8 +294,14 @@ function normalizeSOStatus(status) {
     confirmed: 'packed',
     processing: 'packed',
     ready_to_ship: 'packed',
+    partial_delivery: 'partial_delivered',
     partial_shipped: 'partial_delivered',
+    invoiced: 'awaiting_payment',
+    waiting_payment: 'awaiting_payment',
+    pending_payment: 'awaiting_payment',
+    awaiting_payment: 'awaiting_payment',
     shipped: 'delivered',
+    paid: 'paid',
     completed: 'delivered',
     cancelled: 'canceled',
   };

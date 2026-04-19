@@ -175,7 +175,7 @@ export default function GoodsReceiving() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">No. PO</th>
+                <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">No. Pemesanan</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden md:table-cell">Supplier</th>
                 <th className="text-left px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Tgl Terima</th>
                 <th className="text-right px-5 py-3.5 font-semibold text-gray-600 hidden lg:table-cell">Total Item</th>
